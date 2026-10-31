@@ -1,0 +1,2053 @@
+{
+  "name": "Kemet - The Nile Flow | Adaptive Socratic Tutor (Qdrant + Memory)",
+  "nodes": [
+    {
+      "parameters": {
+        "updates": [
+          "message",
+          "callback_query"
+        ],
+        "additionalFields": {}
+      },
+      "id": "c2303739-6352-4104-a04d-48192e5322d6",
+      "name": "Telegram Trigger",
+      "type": "n8n-nodes-base.telegramTrigger",
+      "typeVersion": 1.1,
+      "position": [
+        32,
+        416
+      ],
+      "webhookId": "c278d606-b59d-4318-9e45-e2402f8f1b01",
+      "credentials": {
+        "telegramApi": {
+          "id": "BftCpADe7P1MdspT",
+          "name": "Telegram account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "mode": "runOnceForEachItem",
+        "jsCode": "const j = $input.item.json;\nconst cyrb53 = (str, seed = 0) => {\n  let h1 = 0xdeadbeef ^ seed, h2 = 0x41c6ce57 ^ seed;\n  for (let i = 0, ch; i < str.length; i++) {\n    ch = str.charCodeAt(i);\n    h1 = Math.imul(h1 ^ ch, 2654435761);\n    h2 = Math.imul(h2 ^ ch, 1597334677);\n  }\n  h1 = Math.imul(h1 ^ (h1 >>> 16), 2246822507) ^ Math.imul(h2 ^ (h2 >>> 13), 3266489909);\n  h2 = Math.imul(h2 ^ (h2 >>> 16), 2246822507) ^ Math.imul(h1 ^ (h1 >>> 13), 3266489909);\n  return 4294967296 * (2097151 & h2) + (h1 >>> 0);\n};\nlet out;\nif (j.body !== undefined && j.headers !== undefined) {\n  // Web portal (Webhook)\n  const b = j.body || {};\n  out = {\n    channel: 'web', chat_id: null, raw: 'web:' + String(b.student_id || 'anonymous'),\n    student_name: b.name || '', text: String(b.message || '').trim(),\n    callback_data: String(b.callback_data || ''), email: b.email || '', callback_query_id: null\n  };\n} else if (j.callback_query) {\n  const cq = j.callback_query;\n  out = {\n    channel: 'telegram', chat_id: cq.message.chat.id, raw: 'tg:' + cq.from.id,\n    student_name: cq.from.first_name || '', text: '', callback_data: cq.data || '',\n    email: '', callback_query_id: cq.id\n  };\n} else {\n  const m = j.message || j.edited_message || {};\n  out = {\n    channel: 'telegram', chat_id: m.chat ? m.chat.id : null,\n    raw: 'tg:' + (m.from ? m.from.id : (m.chat ? m.chat.id : 'unknown')),\n    student_name: (m.from && m.from.first_name) || '', text: String(m.text || '').trim(),\n    callback_data: '', email: '', callback_query_id: null\n  };\n}\n// Pseudonymised numeric id (FERPA/COPPA): the raw Telegram id is never stored.\nout.student_id = cyrb53(out.raw, 7);\ndelete out.raw;\nreturn { json: out };"
+      },
+      "id": "44c50cc4-7de0-4af2-b209-d73394732ffa",
+      "name": "Normalize Input",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        256,
+        608
+      ]
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "e5f37de2-d73a-4acf-b4d4-84008a0093d7",
+              "name": "qdrant_url",
+              "value": "https://16521be8-e6ba-4636-a06a-3676bb90786d.eu-west-1-0.aws.cloud.qdrant.io",
+              "type": "string"
+            },
+            {
+              "id": "e2910576-a74b-4b59-bcc7-cbad3232aa75",
+              "name": "col_bank",
+              "value": "kemet_unit1_bank",
+              "type": "string"
+            },
+            {
+              "id": "29550669-e12c-4644-bb1f-b23982160a28",
+              "name": "col_knowledge",
+              "value": "kemet_unit1_knowledge",
+              "type": "string"
+            },
+            {
+              "id": "4d5ef8fe-7fac-4de0-9fb8-5a080013cc99",
+              "name": "col_memory",
+              "value": "kemet_student_memory",
+              "type": "string"
+            },
+            {
+              "id": "e33936e1-2f87-4f1f-ae01-e726850bbe5b",
+              "name": "col_profiles",
+              "value": "kemet_student_profiles",
+              "type": "string"
+            },
+            {
+              "id": "8161f5da-f2f0-4ad9-9b7c-d3460ed09683",
+              "name": "teacher_email",
+              "value": "rihamsalahali@gmail.com",
+              "type": "string"
+            },
+            {
+              "id": "931c2534-cdc4-447c-94e7-4d13027e1c12",
+              "name": "report_threshold",
+              "value": 70,
+              "type": "number"
+            },
+            {
+              "id": "5486eca5-d9b5-407d-a817-415772781e08",
+              "name": "set_size",
+              "value": 5,
+              "type": "number"
+            },
+            {
+              "id": "d16869dd-2705-416c-bc99-c0bf121421be",
+              "name": "helpline_text",
+              "value": "If you are in Egypt you can call the child helpline 16000 or the mental-health hotline 08008880700.",
+              "type": "string"
+            }
+          ]
+        },
+        "includeOtherFields": true,
+        "options": {}
+      },
+      "id": "87bd0245-1937-4cc7-acf1-bb7cd6b8af4a",
+      "name": "Config",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        480,
+        608
+      ]
+    },
+    {
+      "parameters": {
+        "url": "={{ $json.qdrant_url }}/collections/{{ $json.col_profiles }}/points/{{ $json.student_id }}",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "qdrantApi",
+        "options": {
+          "response": {
+            "response": {
+              "neverError": true
+            }
+          }
+        }
+      },
+      "id": "14168a70-03d3-4e8b-a5e2-eeed7a3e039a",
+      "name": "Load Student Profile (Qdrant)",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        704,
+        608
+      ],
+      "credentials": {
+        "qdrantApi": {
+          "id": "aDfzW7xM3VLVYCRB",
+          "name": "Qdrant account"
+        }
+      },
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "mode": "runOnceForEachItem",
+        "jsCode": "const n = $('Config').first().json;\nconst res = $input.item.json || {};\nconst stored = (res.result && res.result.payload) ? res.result.payload : null;\nconst profile = Object.assign({\n  student_id: n.student_id, name: '', email: '', level: 2, bank: 'ALL', mode: 'chat',\n  streak: 0, attempt: 1, current_qid: null, current_options: [], current_tier: null, seen: [],\n  set_answered: 0, set_correct: 0, total_answered: 0, total_correct: 0,\n  mastery: {}, jre_history: [], created_at: new Date().toISOString()\n}, stored || {});\nif (n.email) profile.email = n.email;\nif (!profile.name && n.student_name) profile.name = n.student_name;\nreturn { json: { ...n, profile, is_new: !stored } };"
+      },
+      "id": "3fe8d6b9-8779-4ab7-9a05-c33baec7ae09",
+      "name": "Merge Profile",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        992,
+        608
+      ]
+    },
+    {
+      "parameters": {
+        "mode": "runOnceForEachItem",
+        "jsCode": "// WINGS OF ISIS - safety, integrity and scope guardrail + intent router\nconst d = $input.item.json;\nconst text = (d.text || '').trim();\nconst cb = d.callback_data || '';\nconst words = text.split(/\\s+/).filter(Boolean).length;\n\nconst emailPattern = /^[^\\s@]+@[^\\s@]+\\.[^\\s@]+$/;\nconst distress = /(kill myself|suicid|end my life|want to die|self[- ]?harm|hurt myself|no reason to live|انتحر|اقتل نفسي|عايز اموت|عاوز اموت|أريد أن أموت|مش عايز اعيش)/i;\nconst cheating = /(write (my|the|an?) (whole )?(essay|paragraph|homework)|do my homework|give me (all )?the answers?|just tell me the answer|answer key|اكتبلي|اكتب لي|حل لي الواجب)/i;\nconst offTopic = /(python|javascript|write (some )?code|bitcoin|football score|who won the|minecraft|fortnite|election|dating|celebrity gossip)/i;\n\n// Included guidebook, guide, and Arabic aliases to ensure they are captured as commands\nconst greetingOrMenu = /^(hi+|hello+|hey+|start|help|menu|stop|exit|guidebook|guide|doleel|دليل|good (morning|afternoon|evening)|welcome|salam|اهلا|أهلا|مرحبا|السلام عليكم|ازيك|صباح الخير|مساء الخير|ابدا|ابدأ|القائمة|رجوع|توقف)$/i;\n\nlet route = 'socratic', block_reason = '';\nif (distress.test(text)) route = 'distress';\nelse if (cheating.test(text)) { route = 'blocked'; block_reason = 'cheating'; }\nelse if (offTopic.test(text) && words < 30) { route = 'blocked'; block_reason = 'offtopic'; }\nelse if (emailPattern.test(text)) route = 'command';\nelse if (cb) route = (cb.startsWith('ans:') || cb === 'next') ? 'quiz' : 'command';\nelse if (text.startsWith('/')) route = text.toLowerCase().startsWith('/quiz') ? 'quiz' : 'command';\nelse if (greetingOrMenu.test(text)) route = 'command';\nelse if (d.profile.mode === 'essay_builder') route = 'socratic'; // Routes directly to Gemini!\n\nreturn { json: { ...d, route, block_reason, words } };"
+      },
+      "id": "9b6d9f10-f115-40a0-9f1e-b0c343c338f4",
+      "name": "Wings of Isis Guardrail",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1280,
+        608
+      ]
+    },
+    {
+      "parameters": {
+        "rules": {
+          "values": [
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 2
+                },
+                "conditions": [
+                  {
+                    "id": "6266e7c9-79f9-4555-9eb1-0cb9d6f0b395",
+                    "leftValue": "={{ $json.route }}",
+                    "rightValue": "distress",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "distress"
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 2
+                },
+                "conditions": [
+                  {
+                    "id": "4cd5318e-69a4-4a99-a01e-d1b8b04904a1",
+                    "leftValue": "={{ $json.route }}",
+                    "rightValue": "blocked",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "blocked"
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 2
+                },
+                "conditions": [
+                  {
+                    "id": "89a0c48f-82c5-4d35-a921-72c977bae422",
+                    "leftValue": "={{ $json.route }}",
+                    "rightValue": "quiz",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "quiz"
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 2
+                },
+                "conditions": [
+                  {
+                    "id": "6294cfff-d735-45e4-b13e-6b758cbc4408",
+                    "leftValue": "={{ $json.route }}",
+                    "rightValue": "jre",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "jre"
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 2
+                },
+                "conditions": [
+                  {
+                    "id": "43362e89-5809-4a84-8185-b65413106282",
+                    "leftValue": "={{ $json.route }}",
+                    "rightValue": "command",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "command"
+            }
+          ]
+        },
+        "options": {
+          "fallbackOutput": "extra",
+          "renameFallbackOutput": "socratic"
+        }
+      },
+      "id": "cef51d32-eca7-4704-ad38-f5b88e57ea3c",
+      "name": "Route Intent",
+      "type": "n8n-nodes-base.switch",
+      "typeVersion": 3.2,
+      "position": [
+        1504,
+        544
+      ]
+    },
+    {
+      "parameters": {
+        "mode": "runOnceForEachItem",
+        "jsCode": "const d = $input.item.json;\nconst reply = `💛 I'm really glad you told me. What you are feeling matters more than any lesson, and you do not have to carry it alone.\\n\\nPlease talk to someone you trust right now - a parent, a family member or your school counsellor. ${d.helpline_text}\\n\\nWe will pause the English practice. When you feel ready, I am here.`;\nreturn { json: { ...d, reply_text: reply, keyboard_type: 'text', options: [], qid: null,\n  profile: d.profile, email_payload: null, memory_item: null } };"
+      },
+      "id": "c7fd559a-ba75-4d1f-809e-d511b5723927",
+      "name": "Distress Reply",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        2304,
+        80
+      ]
+    },
+    {
+      "parameters": {
+        "mode": "runOnceForEachItem",
+        "jsCode": "const d = $input.item.json;\nconst kb = d.keyboard_type || 'text';\nconst esc = (s) => String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');\nconst out = { ...d };\nout.profile = { ...d.profile, updated_at: new Date().toISOString() };\nout.student_key = 'S' + d.student_id;\n\n// 1. Convert Markdown bold and links to Telegram HTML\nlet text = esc(d.reply_text)\n  .replace(/\\*\\*(.+?)\\*\\*/g, '<b>$1</b>')\n  .replace(/\\[(.+?)\\]\\((https?:\\/\\/[^\\s)]+)\\)/g, '<a href=\"$2\"><b>$1</b></a>');\n\n// 2. Attach the Supabase Card Image for Vocabulary (V1 questions)\nconst SUPABASE_BASE_URL = \"https://jubfxtevvdzjbimputjw.supabase.co/storage/v1/object/public/kemet-assets/vocab/\";\n\nif (d.qid && d.qid.startsWith('V1')) {\n  const imageUrl = `${SUPABASE_BASE_URL}${d.qid}.png`;\n  text = `<a href=\"${imageUrl}\">&#8205;</a>` + text;\n}\n\nout.tg_text = text;\n['a', 'b', 'c', 'd'].forEach((l, i) => { out['cb_' + l] = d.qid ? `ans:${d.qid}:${i}` : 'next'; });\nout.cb_next = 'next';\nout.route_key = d.channel === 'web' ? 'web' : 'tg_' + kb;\nout.web_response = {\n  reply: d.reply_text, \n  keyboard: kb, \n  options: d.options || [], \n  question_id: d.qid || null,\n  level: out.profile.level, \n  streak: out.profile.streak,\n  progress: { answered: out.profile.total_answered, correct: out.profile.total_correct }\n};\n\nreturn { json: out };"
+      },
+      "id": "a0e6ae1c-54d1-443c-80c5-31d18702b740",
+      "name": "Finalize Output",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        2528,
+        432
+      ]
+    },
+    {
+      "parameters": {
+        "method": "PUT",
+        "url": "={{ $json.qdrant_url }}/collections/{{ $json.col_profiles }}/points?wait=true",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "qdrantApi",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ points: [{ id: $json.student_id, vector: [0], payload: $json.profile }] }) }}",
+        "options": {}
+      },
+      "id": "e87034ed-1640-4069-bef5-92c376104a0b",
+      "name": "Save Student Profile (Qdrant)",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        2752,
+        208
+      ],
+      "credentials": {
+        "qdrantApi": {
+          "id": "aDfzW7xM3VLVYCRB",
+          "name": "Qdrant account"
+        }
+      },
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "rules": {
+          "values": [
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 2
+                },
+                "conditions": [
+                  {
+                    "id": "f173abec-2a11-4244-8ec0-8e7f55e69681",
+                    "leftValue": "={{ $json.route_key }}",
+                    "rightValue": "tg_text",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "tg_text"
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 2
+                },
+                "conditions": [
+                  {
+                    "id": "3671add2-dde4-4406-87df-edf6fd6c967c",
+                    "leftValue": "={{ $json.route_key }}",
+                    "rightValue": "tg_mcq4",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "tg_mcq4"
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 2
+                },
+                "conditions": [
+                  {
+                    "id": "a05ad4e4-8771-4b78-8031-7a13aacb8a28",
+                    "leftValue": "={{ $json.route_key }}",
+                    "rightValue": "tg_mcq2",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "tg_mcq2"
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 2
+                },
+                "conditions": [
+                  {
+                    "id": "9a873133-89ae-4994-b3ee-c954acde1496",
+                    "leftValue": "={{ $json.route_key }}",
+                    "rightValue": "tg_next",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "tg_next"
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 2
+                },
+                "conditions": [
+                  {
+                    "id": "9216f2b3-3a06-4c63-bda4-6f66f6109776",
+                    "leftValue": "={{ $json.route_key }}",
+                    "rightValue": "web",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "web"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "d55e8bae-ab06-49fb-8364-5575fd3ab00e",
+      "name": "Route by Channel",
+      "type": "n8n-nodes-base.switch",
+      "typeVersion": 3.2,
+      "position": [
+        2752,
+        400
+      ]
+    },
+    {
+      "parameters": {
+        "chatId": "={{ $json.chat_id }}",
+        "text": "={{ $json.tg_text }}",
+        "replyMarkup": "inlineKeyboard",
+        "inlineKeyboard": {
+          "rows": [
+            {
+              "row": {
+                "buttons": [
+                  {
+                    "text": "🌊 Official Platform ➔",
+                    "additionalFields": {
+                      "url": "https://glowing-tabletop-production.weweb.io/"
+                    }
+                  },
+                  {
+                    "text": "📱 Mobile Application 📲",
+                    "additionalFields": {
+                      "url": "https://kemet-master-ancient-egyptian-scribe-gold-design.ai.studio/"
+                    }
+                  }
+                ]
+              }
+            },
+            {
+              "row": {
+                "buttons": [
+                  {
+                    "text": "▶️ YouTube Channel",
+                    "additionalFields": {
+                      "url": "https://www.youtube.com/@KemetTheNileFlow"
+                    }
+                  },
+                  {
+                    "text": "📸 Instagram",
+                    "additionalFields": {
+                      "url": "https://www.instagram.com/kemethenile/"
+                    }
+                  }
+                ]
+              }
+            },
+            {
+              "row": {
+                "buttons": [
+                  {
+                    "text": "📘 Facebook Page",
+                    "additionalFields": {
+                      "url": "https://www.facebook.com/people/Kemet-The-Nile-Flow/61595359775648/?mibextid=wwXIfr&rdid=l45Jc2MSuGOHcDiK&share_url=https%3A%2F%2Fwww.facebook.com%2Fshare%2F1CDMaxKF8q%2F%3Fmibextid%3DwwXIfr"
+                    }
+                  },
+                  {
+                    "text": "🏠 Main Menu",
+                    "additionalFields": {
+                      "callback_data": "Menu ```[cite: 1]"
+                    }
+                  }
+                ]
+              }
+            }
+          ]
+        },
+        "additionalFields": {
+          "appendAttribution": false,
+          "parse_mode": "HTML"
+        }
+      },
+      "id": "77d05f02-d775-42a9-9d25-e2471564b987",
+      "name": "Telegram: Text",
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [
+        2976,
+        64
+      ],
+      "webhookId": "35f61f4b-23ba-44d6-9712-5e838af53345",
+      "credentials": {
+        "telegramApi": {
+          "id": "BftCpADe7P1MdspT",
+          "name": "Telegram account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "chatId": "={{ $json.chat_id }}",
+        "text": "={{ $json.tg_text }}",
+        "replyMarkup": "inlineKeyboard",
+        "inlineKeyboard": {
+          "rows": [
+            {
+              "row": {
+                "buttons": [
+                  {
+                    "text": "A",
+                    "additionalFields": {
+                      "callback_data": "={{ $json.cb_a }}"
+                    }
+                  },
+                  {
+                    "text": "B",
+                    "additionalFields": {
+                      "callback_data": "={{ $json.cb_b }}"
+                    }
+                  }
+                ]
+              }
+            },
+            {
+              "row": {
+                "buttons": [
+                  {
+                    "text": "C",
+                    "additionalFields": {
+                      "callback_data": "={{ $json.cb_c }}"
+                    }
+                  },
+                  {
+                    "text": "D",
+                    "additionalFields": {
+                      "callback_data": "={{ $json.cb_d }}"
+                    }
+                  }
+                ]
+              }
+            },
+            {
+              "row": {
+                "buttons": [
+                  {
+                    "text": "🏠 Main Menu",
+                    "additionalFields": {
+                      "callback_data": "menu"
+                    }
+                  }
+                ]
+              }
+            }
+          ]
+        },
+        "additionalFields": {
+          "appendAttribution": false,
+          "parse_mode": "HTML"
+        }
+      },
+      "id": "79a049a6-ffed-4b5a-b9e3-cc466c88326d",
+      "name": "Telegram: 4 Options",
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [
+        2976,
+        256
+      ],
+      "webhookId": "e2a24622-54e3-4254-bed4-97d284a8e9b7",
+      "credentials": {
+        "telegramApi": {
+          "id": "BftCpADe7P1MdspT",
+          "name": "Telegram account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "chatId": "={{ $json.chat_id }}",
+        "text": "={{ $json.tg_text }}",
+        "replyMarkup": "inlineKeyboard",
+        "inlineKeyboard": {
+          "rows": [
+            {
+              "row": {
+                "buttons": [
+                  {
+                    "text": "A",
+                    "additionalFields": {
+                      "callback_data": "={{ $json.cb_a }}"
+                    }
+                  },
+                  {
+                    "text": "B",
+                    "additionalFields": {
+                      "callback_data": "={{ $json.cb_b }}"
+                    }
+                  }
+                ]
+              }
+            }
+          ]
+        },
+        "additionalFields": {
+          "appendAttribution": false,
+          "parse_mode": "HTML"
+        }
+      },
+      "id": "c98ad867-944d-4f11-9db5-f4d997f90160",
+      "name": "Telegram: 2 Options",
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [
+        2976,
+        448
+      ],
+      "webhookId": "f76a4941-8ca8-4bbe-badf-fbb685b23859",
+      "credentials": {
+        "telegramApi": {
+          "id": "BftCpADe7P1MdspT",
+          "name": "Telegram account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "chatId": "={{ $json.chat_id }}",
+        "text": "={{ $json.tg_text }}",
+        "replyMarkup": "inlineKeyboard",
+        "inlineKeyboard": {
+          "rows": [
+            {
+              "row": {
+                "buttons": [
+                  {
+                    "text": "Next question ▶",
+                    "additionalFields": {
+                      "callback_data": "={{ $json.cb_next }}"
+                    }
+                  },
+                  {
+                    "text": "🏠 Main Menu",
+                    "additionalFields": {
+                      "callback_data": "menu"
+                    }
+                  }
+                ]
+              }
+            }
+          ]
+        },
+        "additionalFields": {
+          "appendAttribution": false,
+          "parse_mode": "HTML"
+        }
+      },
+      "id": "88519a5b-010b-4160-b189-a5ea9f913327",
+      "name": "Telegram: Next",
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [
+        2976,
+        640
+      ],
+      "webhookId": "f4ea5db5-c9ca-4c60-823b-7ece840cacf5",
+      "credentials": {
+        "telegramApi": {
+          "id": "BftCpADe7P1MdspT",
+          "name": "Telegram account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ JSON.stringify($json.web_response) }}",
+        "options": {}
+      },
+      "id": "0b66a787-f0db-47bc-bd3a-b62220b263c1",
+      "name": "Respond to Web Portal",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [
+        2976,
+        832
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "5f7f327f-a067-482d-811e-e89090684004",
+              "leftValue": "={{ !!$json.email_payload }}",
+              "rightValue": "",
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "23523c09-2919-462f-97f6-8163996c2640",
+      "name": "Email Needed?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        2752,
+        1024
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "download",
+        "fileId": {
+          "__rl": true,
+          "value": "1CZcejzz9hHbm1XuGqVueLuukrWrlYSzu",
+          "mode": "list",
+          "cachedResultName": "KEMET Student Guidebook.pdf",
+          "cachedResultUrl": "https://drive.google.com/file/d/1CZcejzz9hHbm1XuGqVueLuukrWrlYSzu/view?usp=drivesdk"
+        },
+        "options": {}
+      },
+      "id": "0bb7d976-203c-417b-ab78-6ff1fcaa161a",
+      "name": "Download file",
+      "type": "n8n-nodes-base.googleDrive",
+      "typeVersion": 3,
+      "position": [
+        2976,
+        1024
+      ],
+      "alwaysOutputData": true,
+      "credentials": {
+        "googleDriveOAuth2Api": {
+          "id": "FI1Fz3BT3W24JBYE",
+          "name": "Google Drive account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "sendTo": "={{ $('Finalize Output').first().json.email_payload.to }}",
+        "subject": "={{ $('Finalize Output').first().json.email_payload.subject }}",
+        "message": "={{ '<div style=\"text-align:center;margin-bottom:16px;max-width:580px;margin-left:auto;margin-right:auto;\"><img src=\"https://i.postimg.cc/NjSQj1tZ/kemet-banner.jpg\" alt=\"Kemet: The Nile Flow\" style=\"display:block;width:100%;max-width:580px;height:auto;border-radius:8px;border:0;\"></div>' + $('Finalize Output').first().json.email_payload.html }}",
+        "options": {
+          "attachmentsUi": {
+            "attachmentsBinary": [
+              {}
+            ]
+          }
+        }
+      },
+      "id": "79007783-a5ea-449e-bbb1-711fd307ad6a",
+      "name": "Send a message",
+      "type": "n8n-nodes-base.gmail",
+      "typeVersion": 2.2,
+      "position": [
+        3264,
+        1024
+      ],
+      "webhookId": "406a42c3-0b41-4c35-b159-d77a5b85187e",
+      "credentials": {
+        "gmailOAuth2": {
+          "id": "YsnOiagIyKbWY4qD",
+          "name": "Gmail account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "11a764b5-ceb9-46ab-9295-06c4a5e03184",
+              "leftValue": "={{ !!$json.memory_item }}",
+              "rightValue": "",
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "b206c689-3fae-408d-b314-fafee413e5c3",
+      "name": "Memory Worth Saving?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        2752,
+        1328
+      ]
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "30beca0b-9883-4b4b-92bf-67f620dce973",
+              "name": "text",
+              "value": "={{ $json.memory_item.text }}",
+              "type": "string"
+            },
+            {
+              "id": "ce6efb63-5094-4d70-a23f-dd4248e4b3d3",
+              "name": "student_key",
+              "value": "={{ $json.student_key }}",
+              "type": "string"
+            },
+            {
+              "id": "6a824584-bb8f-410d-8a06-c246baae94df",
+              "name": "type",
+              "value": "={{ $json.memory_item.type }}",
+              "type": "string"
+            },
+            {
+              "id": "0ee69964-2309-44d7-ad6d-ae12606ea13f",
+              "name": "skill",
+              "value": "={{ $json.memory_item.skill }}",
+              "type": "string"
+            },
+            {
+              "id": "44e5f356-f0c9-42a4-ae27-5e365e655efc",
+              "name": "qid",
+              "value": "={{ $json.memory_item.qid }}",
+              "type": "string"
+            },
+            {
+              "id": "995d08a4-b56c-48ad-853d-dd2e2c2f11a9",
+              "name": "ts",
+              "value": "={{ $now.toISO() }}",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "728be215-faeb-4735-a167-b1e585537d08",
+      "name": "Build Memory Document",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        2976,
+        1328
+      ]
+    },
+    {
+      "parameters": {
+        "mode": "insert",
+        "qdrantCollection": {
+          "__rl": true,
+          "value": "kemet_student_memory",
+          "mode": "id"
+        },
+        "options": {}
+      },
+      "id": "7af56404-3a07-4937-9559-b1b7497ca4ee",
+      "name": "Qdrant: Save Student Memory",
+      "type": "@n8n/n8n-nodes-langchain.vectorStoreQdrant",
+      "typeVersion": 1.1,
+      "position": [
+        3200,
+        1328
+      ],
+      "credentials": {
+        "qdrantApi": {
+          "id": "aDfzW7xM3VLVYCRB",
+          "name": "Qdrant account"
+        }
+      },
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "modelName": "=models/gemini-embedding-001"
+      },
+      "id": "23d0c7d4-44b8-4156-b006-8ce108de9ae7",
+      "name": "Embeddings Gemini",
+      "type": "@n8n/n8n-nodes-langchain.embeddingsGoogleGemini",
+      "typeVersion": 1,
+      "position": [
+        944,
+        1024
+      ],
+      "credentials": {
+        "googlePalmApi": {
+          "id": "Mxxl3YyGQJf0Wy8R",
+          "name": "Google Gemini(PaLM) Api account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsonMode": "expressionData",
+        "jsonData": "={{ $json.text }}",
+        "options": {
+          "metadata": {
+            "metadataValues": [
+              {
+                "name": "student_key",
+                "value": "={{ $json.student_key }}"
+              },
+              {
+                "name": "type",
+                "value": "={{ $json.type }}"
+              },
+              {
+                "name": "skill",
+                "value": "={{ $json.skill }}"
+              },
+              {
+                "name": "qid",
+                "value": "={{ $json.qid }}"
+              },
+              {
+                "name": "ts",
+                "value": "={{ $json.ts }}"
+              }
+            ]
+          }
+        }
+      },
+      "id": "a7879933-aa92-40ae-a6d8-4f2e015d8364",
+      "name": "Memory Document Loader",
+      "type": "@n8n/n8n-nodes-langchain.documentDefaultDataLoader",
+      "typeVersion": 1.1,
+      "position": [
+        3280,
+        1552
+      ]
+    },
+    {
+      "parameters": {
+        "mode": "runOnceForEachItem",
+        "jsCode": "const d = $input.item.json;\nlet reply = '';\n\nif (d.block_reason === 'cheating') {\n  reply = `🪽 Wings of Isis: I can't write your answers or essay for you - but I can walk beside you until YOU can.\\n\\nLet's start small (Justification): what is your position on the question, in one sentence? Or tap /quiz for adaptive practice.`;\n} else if (d.block_reason === 'too_short') {\n  reply = `🪽 Your writing is a bit too short for me to properly evaluate on the 4-dimension JRE+ rubric! Please expand your thoughts and aim for at least 150 words.\\n\\nOr tap /menu to return to the Main Menu.`;\n} else {\n  reply = `🪽 Wings of Isis: I'm Kemet, your Unit 1 English tutor (Living Well in a Complex World + The Lost World, Chapter 1), so I'll stay within that map.\\n\\nTry /quiz for practice, /essay for JRE+ feedback, or ask me about Unit 1 grammar, vocabulary or readings.`;\n}\n\nreturn { json: { ...d, reply_text: reply, keyboard_type: 'text', options: [], qid: null, profile: d.profile, email_payload: null, memory_item: null } };"
+      },
+      "id": "565a34cc-8415-4d5f-ab2b-47dcd0ed2eba",
+      "name": "Blocked Reply",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        2304,
+        272
+      ]
+    },
+    {
+      "parameters": {
+        "mode": "runOnceForEachItem",
+        "jsCode": "const d = $input.item.json;\nconst p = d.profile;\nconst cb = d.callback_data || '';\nlet mode = 'serve', qid = null, selected = null;\nif (cb.startsWith('ans:')) {\n  const parts = cb.split(':');\n  qid = parts[1]; selected = parseInt(parts[2], 10);\n  if (p.current_qid && qid === p.current_qid) mode = 'check';   // stale buttons just serve a new question\n}\nlet body;\nif (mode === 'check') {\n  body = { filter: { must: [{ key: 'metadata.id', match: { value: qid } }] }, limit: 1, with_payload: true, with_vector: false };\n} else {\n  const must = [\n    { key: 'metadata.tier', match: { value: 'T' + p.level } },\n    { key: 'metadata.format', match: { value: 'mcq' } }\n  ];\n  if (p.bank && p.bank !== 'ALL' && p.level > 0) must.push({ key: 'metadata.bank', match: { value: p.bank } });\n  const filter = { must };\n  if ((p.seen || []).length) filter.must_not = [{ key: 'metadata.id', match: { any: p.seen } }];\n  body = { filter, limit: 60, with_payload: true, with_vector: false };\n}\nreturn { json: { ...d, quiz_mode: mode, qid, selected, qdrant_body: body } };"
+      },
+      "id": "ae1456d4-a9ef-4422-826d-23b8dc3744be",
+      "name": "Quiz Planner",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1728,
+        560
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $json.qdrant_url }}/collections/{{ $json.col_bank }}/points/scroll",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "qdrantApi",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify($json.qdrant_body) }}",
+        "options": {}
+      },
+      "id": "34472e95-80c4-4edb-86f5-8c34a8927aea",
+      "name": "Fetch Question (Qdrant)",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        2016,
+        560
+      ],
+      "credentials": {
+        "qdrantApi": {
+          "id": "aDfzW7xM3VLVYCRB",
+          "name": "Qdrant account"
+        }
+      },
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "mode": "runOnceForEachItem",
+        "jsCode": "// ADAPTIVE ENGINE: Observe -> Decide -> Act (Backtick-free + Skill Names + /menu footer)\nconst pl = $('Quiz Planner').first().json;\nconst res = $input.item.json || {};\nconst p = JSON.parse(JSON.stringify(pl.profile));\np.mastery = p.mastery || {};\n\nconst FALLBACK_BANK = [\n  { id: \"D1-01\", bank: \"D1\", tier: 0, prompt: \"Choose the correct word: The teacher ___ helps me is kind.\", options: [\"who\", \"which\"], answer: \"who\", why: \"Use 'who' for a person doing the action in a relative clause.\" },\n  { id: \"D1-02\", bank: \"D1\", tier: 0, prompt: \"Choose the correct word: The book ___ I borrowed is on the desk.\", options: [\"who\", \"which\"], answer: \"which\", why: \"Use 'which' for things in a relative clause.\" },\n  { id: \"D1-06\", bank: \"D1\", tier: 0, prompt: \"Choose the correct word: The boy ___ football is my brother.\", options: [\"playing\", \"played\"], answer: \"playing\", why: \"The boy performs the action, so we use the active -ing form.\" },\n  { id: \"D1-08\", bank: \"D1\", tier: 0, prompt: \"Choose the correct word: ___ tired, Ali sat down to rest.\", options: [\"Feeling\", \"Felt\"], answer: \"Feeling\", why: \"Ali is the person experiencing the feeling, so use the active -ing participle.\" },\n  { id: \"D1-12\", bank: \"D1\", tier: 0, prompt: \"Choose the correct word: If I were you, I ___ ask the teacher.\", options: [\"will\", \"would\"], answer: \"would\", why: \"Second-conditional advice ('If I were you') takes 'would' + base verb.\" },\n\n  { id: \"V1-01\", bank: \"V1\", tier: 1, prompt: \"A period of ten years is called a ___.\", options: [\"survey\", \"decade\", \"platform\", \"symptom\"], answer: \"decade\", why: \"A decade refers to a period of ten years.\" },\n  { id: \"V1-07\", bank: \"V1\", tier: 1, prompt: \"A ___ lifestyle involves spending too much time sitting and using screens.\", options: [\"active\", \"balanced\", \"physical\", \"sedentary\"], answer: \"sedentary\", why: \"An inactive routine with very little movement is defined as sedentary.\" },\n  { id: \"R1-03\", bank: \"R1\", tier: 1, prompt: \"I know a student ___ brother works as a school counselor.\", options: [\"who\", \"whom\", \"which\", \"whose\"], answer: \"whose\", why: \"Use the possessive relative pronoun 'whose' directly before a noun.\" },\n  { id: \"P1-03\", bank: \"P1\", tier: 1, prompt: \"Which sentence is grammatically correct?\", options: [\"The article which I read was useful.\", \"The article which I read it was useful.\", \"The article which read I was useful.\", \"The article I which read was useful.\"], answer: \"The article which I read was useful.\", why: \"The relative pronoun already replaces the object, so repeating 'it' is incorrect.\" },\n  { id: \"C1-06\", bank: \"C1\", tier: 1, prompt: \"If I ___ you, I would check the source of that health claim.\", options: [\"were\", \"am\", \"will be\", \"had been\"], answer: \"were\", why: \"Formal second-conditional advice uses 'If I were you'.\" },\n\n  { id: \"V1-11\", bank: \"V1\", tier: 2, prompt: \"According to Bandura, a person's belief in their ability to succeed and change habits is called ___.\", options: [\"self-esteem\", \"social comparison\", \"dissatisfaction\", \"self-efficacy\"], answer: \"self-efficacy\", why: \"Bandura defines belief in one's own capability to execute actions as self-efficacy.\" },\n  { id: \"R1-15\", bank: \"R1\", tier: 2, prompt: \"Choose the sentence that avoids a repeated object pronoun error:\", options: [\"The study I read it yesterday was clear.\", \"The study who I read was clear.\", \"The study where I read was clear.\", \"The study I read yesterday was clear.\"], answer: \"The study I read yesterday was clear.\", why: \"In a relative clause, do not repeat the object pronoun ('it') after the verb.\" },\n  { id: \"P1-14\", bank: \"P1\", tier: 2, prompt: \"Which sentence avoids a dangling participle?\", options: [\"Walking to school, the rain began.\", \"Walking to school, I felt the rain begin.\", \"Walking to school, the umbrella was forgotten.\", \"Having walked to school, the rain started.\"], answer: \"Walking to school, I felt the rain begin.\", why: \"The person doing the walking must appear as the main subject immediately after the comma.\" },\n  { id: \"C2-15\", bank: \"C2\", tier: 2, prompt: \"Which is a correct formal inversion of: 'If I were you, I would rest'?\", options: [\"Were I you, I would rest.\", \"Was I you, I would rest.\", \"Did I were you, I would rest.\", \"If were I you, I would rest.\"], answer: \"Were I you, I would rest.\", why: \"In a second-conditional inversion, 'if' is dropped and 'Were' moves before the subject.\" },\n  { id: \"C1-17\", bank: \"C1\", tier: 2, prompt: \"Schools can improve student well-being ___ families and communities also share responsibility.\", options: [\"in case of\", \"provided that\", \"without\", \"despite\"], answer: \"provided that\", why: \"To introduce a required condition followed by a full subject-verb clause, use 'provided that'.\" },\n  { id: \"N1-12\", bank: \"N1\", tier: 2, prompt: \"In Chapter 1 of The Lost World, why does Edward Malone ask Mr. McArdle for a dangerous assignment?\", options: [\"He wants higher pay.\", \"Gladys Hungerton said she admires a brave man of action.\", \"Professor Challenger invited him.\", \"He wants to leave journalism.\"], answer: \"Gladys Hungerton said she admires a brave man of action.\", why: \"Malone seeks danger to win the admiration of Gladys Hungerton.\" },\n\n  { id: \"V1-21\", bank: \"V1\", tier: 3, prompt: \"A local park is unsafe and healthy food is unaffordable. Under the WHO framework, these are examples of ___.\", options: [\"personal choice\", \"structural barriers\", \"internal locus of control\", \"self-efficacy\"], answer: \"structural barriers\", why: \"Obstacles built into the social or physical environment that limit choice are structural barriers.\" },\n  { id: \"V1-22\", bank: \"V1\", tier: 3, prompt: \"A school cafeteria places fresh fruit at eye level but leaves all other food options available. According to Thaler, this is a ___.\", options: [\"nudge\", \"ban\", \"compulsion\", \"punishment\"], answer: \"nudge\", why: \"Reshaping the choice architecture to make healthy options easier without restricting freedom is a nudge.\" },\n  { id: \"R1-24\", bank: \"R1\", tier: 3, prompt: \"A study shows teens using image-based social media over 3 hours daily are twice as likely to report low self-esteem. Which conclusion is best supported?\", options: [\"Social media directly causes low self-esteem.\", \"There is an association, but causation is not proven.\", \"All teens feel bad on social media.\", \"Social media has zero effect.\"], answer: \"There is an association, but causation is not proven.\", why: \"'Twice as likely to report' demonstrates statistical correlation/association, not proven causation.\" },\n  { id: \"S1-26\", bank: \"S1\", tier: 3, prompt: \"Which sentence uses a correct third-conditional inversion?\", options: [\"Had I slept earlier, I would have focused better.\", \"If I sleep earlier, I will focus better.\", \"Should I sleep earlier, I focus better.\", \"Were I sleeping earlier, I would have focused.\"], answer: \"Had I slept earlier, I would have focused better.\", why: \"Third-conditional inversion drops 'if' and places 'Had' + subject + past participle at the start.\" },\n  { id: \"C1-21\", bank: \"C1\", tier: 3, prompt: \"___ you experience high exam stress, speaking to a family member or counselor can help.\", options: [\"Had\", \"Should\", \"Were\", \"Unless\"], answer: \"Should\", why: \"Formal first-conditional inversion uses 'Should' + subject + base verb.\" }\n];\n\nconst SKILL_LABELS = {\n  D1: 'Diagnostic Support',\n  V1: 'Core Vocabulary',\n  V2: 'Academic Vocabulary',\n  R1: 'Relative Clauses',\n  R2: 'Advanced Relative Clauses',\n  P1: 'Participle Clauses',\n  C1: 'Conditionals & Hedging',\n  C2: 'Conditional Inversions',\n  S1: 'Sentence Synthesis',\n  L1: 'Reading & Listening',\n  N1: 'The Lost World (Ch. 1)'\n};\n\nconst toQ = function(pt) {\n  if (pt.prompt && Array.isArray(pt.options)) return pt;\n  const m = (pt.payload && pt.payload.metadata) || {};\n  return {\n    id: m.id, bank: m.bank, tier: Number(String(m.tier || 'T2').replace('T', '')), prompt: m.prompt,\n    options: String(m.options || '').split('||').filter(Boolean), answer: m.answer, why: m.why || ''\n  };\n};\n\nlet rawPts = (res.result && res.result.points && res.result.points.length) ? res.result.points.map(toQ) : FALLBACK_BANK;\n\nlet pts;\nif (pl.quiz_mode === 'check') {\n  pts = rawPts.filter(function(q) { return q.id === pl.qid; });\n  if (!pts.length) pts = FALLBACK_BANK.filter(function(q) { return q.id === pl.qid; });\n} else {\n  pts = rawPts.filter(function(q) { return q.tier === p.level && (p.bank === 'ALL' || p.level === 0 || q.bank === p.bank) && !(p.seen || []).includes(q.id); });\n  if (!pts.length) {\n    pts = FALLBACK_BANK.filter(function(q) { return q.tier === p.level && (p.bank === 'ALL' || p.level === 0 || q.bank === p.bank) && !(p.seen || []).includes(q.id); });\n  }\n  if (!pts.length) {\n    p.seen = [];\n    pts = FALLBACK_BANK.filter(function(q) { return q.tier === p.level; });\n  }\n}\n\nconst THRESH = Number(pl.report_threshold || 70);\nconst SET = Number(pl.set_size || 5);\nconst TIERS = ['🪷 Support (D1)', '🏛️ Foundation (Tier 1)', '⚖️ Apply (Tier 2)', '👑 Challenge (Tier 3)'];\n\nconst shuffle = function(a) {\n  const b = a.slice();\n  for (let i = b.length - 1; i > 0; i--) {\n    const j = Math.floor(Math.random() * (i + 1));\n    const tmp = b[i]; b[i] = b[j]; b[j] = tmp;\n  }\n  return b;\n};\n\nconst maskAnswer = function(why, ans) {\n  if (!ans) return why;\n  const safe = ans.replace(/[.*+?^${}()|[\\]\\\\]/g, '\\\\$&');\n  return why.replace(new RegExp(safe, 'gi'), '____');\n};\n\nconst fmtQuestion = function(q, o) {\n  const L = ['A', 'B', 'C', 'D'];\n  const skillName = SKILL_LABELS[q.bank] || q.bank;\n  return '🏺 **' + skillName + ' (' + q.id + ')** · ' + TIERS[q.tier] + '\\n\\n❓ ' + q.prompt + '\\n\\n' +\n    o.map(function(x, i) { return '**' + L[i] + ')** ' + x; }).join('\\n') +\n    '\\n\\n──────────\\n🏠 Tap /menu or the button below anytime to pause & return to the Main Menu.';\n};\n\nconst reportHtml = function(pct) {\n  return '<div style=\"font-family:Arial,sans-serif;max-width:580px;color:#12161F;border:1px solid #e0e0e0;border-radius:8px;padding:22px\">' +\n    '<h2 style=\"color:#167B80;margin-top:0\">🏺 KEMET: The Nile Flow - Mastery Report</h2>' +\n    '<p style=\"color:#B8860B;font-style:italic;margin-top:0\">Nourishing your knowledge from the rich soil of Egypt. 🌾💧</p>' +\n    '<div style=\"background:#f4fbfb;padding:14px;border-radius:6px;margin:16px 0;border-left:4px solid #167B80\">' +\n      '<p style=\"margin:4px 0\"><b>Student:</b> ' + (p.name || 'Scholar') + '</p>' +\n      '<p style=\"margin:4px 0\"><b>Practice Set Evaluation:</b> ' + p.set_correct + '/' + p.set_answered + ' first-try correct (' + pct + '%)</p>' +\n      '<p style=\"margin:4px 0\"><b>Current Readiness Tier:</b> ' + TIERS[p.level] + '</p>' +\n      '<p style=\"margin:4px 0;color:' + (pct < THRESH ? '#c53030' : '#22543d') + ';\"><b>Feedback:</b> ' + \n        (pct < THRESH ? 'The score is below the ' + THRESH + '% mastery threshold. A brief teacher check-in is recommended (Human-in-the-Loop).' : 'Solid mastery on this set — outstanding focus!') + \n      '</p>' +\n    '</div>' +\n    '<p style=\"color:#666;font-size:12px;margin-bottom:20px\">💡 Eye of Horus hints are provided before direct answers to protect productive struggle.</p>' +\n    \n    // KEMET Ecosystem Container\n    '<div style=\"background:#fdfcf7;border:1px dashed #d1c18d;border-radius:8px;padding:20px;text-align:center;\">' +\n      '<h4 style=\"color:#167B80;margin:0 0 8px 0;font-size:16px;\">🌐 Explore the Full KEMET Ecosystem</h4>' +\n      '<p style=\"color:#4a5568;font-size:13px;line-height:1.6;margin:0 0 16px 0;\">' +\n        'Immerse yourself deeper in the learning experience with interactive writing labs, live mastery analytics, visual guides, and our multimedia channels:' +\n      '</p>' +\n      \n      // Ecosystem Buttons\n      '<div style=\"margin-bottom:12px;\">' +\n        '<a href=\"https://glowing-tabletop-production.weweb.io/\" target=\"_blank\" style=\"background:#167B80;color:#ffffff;padding:10px 18px;border-radius:20px;text-decoration:none;font-weight:bold;font-size:13px;display:inline-block;margin:4px;\">' +\n          '🌊 Official Platform' +\n        '</a> ' +\n        '<a href=\"https://kemet-master-ancient-egyptian-scribe-gold-design.ai.studio/\" target=\"_blank\" style=\"background:#0E5356;color:#ffffff;padding:10px 18px;border-radius:20px;text-decoration:none;font-weight:bold;font-size:13px;display:inline-block;margin:4px;\">' +\n          '📱 Mobile App' +\n        '</a>' +\n      '</div>' +\n      \n      '<div style=\"margin-bottom:4px;\">' +\n        '<a href=\"https://www.youtube.com/@KemetTheNileFlow\" target=\"_blank\" style=\"background:#c4302b;color:#ffffff;padding:7px 14px;border-radius:16px;text-decoration:none;font-size:12px;display:inline-block;margin:3px;\">' +\n          '▶️ YouTube' +\n        '</a> ' +\n        '<a href=\"https://www.instagram.com/kemethenile/\" target=\"_blank\" style=\"background:#E1306C;color:#ffffff;padding:7px 14px;border-radius:16px;text-decoration:none;font-size:12px;display:inline-block;margin:3px;\">' +\n          '📸 Instagram' +\n        '</a> ' +\n        '<a href=\"https://www.facebook.com/people/Kemet-The-Nile-Flow/61595359775648/?mibextid=wwXIfr&rdid=l45Jc2MSuGOHcDiK&share_url=https%3A%2F%2Fwww.facebook.com%2Fshare%2F1CDMaxKF8q%2F%3Fmibextid%3DwwXIfr\" target=\"_blank\" style=\"background:#1877F2;color:#ffffff;padding:7px 14px;border-radius:16px;text-decoration:none;font-size:12px;display:inline-block;margin:3px;\">' +\n          '📘 Facebook' +\n        '</a>' +\n      '</div>' +\n    '</div>' +\n    '<p style=\"color:#a0aec0;font-size:11px;margin-top:18px;margin-bottom:4px;text-align:center;font-style:italic;\">⚠️ This is an automated notification from a no-reply address. Please do not reply directly to this email.</p>' +\n    '<p style=\"color:#888;font-size:11px;margin-top:4px;text-align:center;\">Protected by the Wings of Isis · KEMET: The Nile Flow Adaptive Socratic Tutor</p>' +\n  '</div>';\n};\n\nlet reply = '', kb = 'text', opts = [], qid = null, email = null, memory = null;\n\nif (pl.quiz_mode === 'check') {\n  const q = pts.length ? pts[0] : null;\n  const chosen = (p.current_options || [])[pl.selected];\n  if (!q || chosen === undefined) {\n    p.current_qid = null; p.attempt = 1;\n    reply = '🪔 Let us load a fresh question for you! Tap **Next question ▶** below (or tap /menu for the Main Menu).';\n    kb = 'next';\n  } else {\n    const bank = q.bank;\n    p.mastery[bank] = p.mastery[bank] || { a: 0, c: 0 };\n    const correct = chosen === q.answer;\n    let resolved = false;\n    if (correct) {\n      resolved = true;\n      if (p.attempt === 1) {\n        p.streak = (p.streak || 0) + 1; p.set_correct++; p.total_correct++; p.mastery[bank].c++;\n        reply = '✅☀️ **Correct on the first try! Shining like KEMET gold!**\\n💡 ' + q.why;\n        if (p.streak >= 2 && p.level < 3) {\n          p.level++; p.streak = 0;\n          reply += '\\n\\n🔼👑 **Two in a row! Moving you UP to ' + TIERS[p.level] + ' on the wings of Isis! 🪽**';\n        } else if (p.streak >= 2) {\n          reply += '\\n\\n🌟 **Challenge-tier streak: ' + p.streak + '!**';\n        } else {\n          reply += '\\n\\n🔥 **Active Streak:** ' + p.streak;\n        }\n      } else {\n        p.streak = 0;\n        reply = '✅🗝️ **You worked it out yourself!**\\n💡 ' + q.why + '\\n\\nLike scholars decoding the Rosetta Stone, you unlocked this! 📜';\n      }\n      kb = 'next';\n    } else if (p.attempt === 1) {\n      p.attempt = 2;\n      opts = p.current_options; qid = q.id;\n      kb = opts.length === 2 ? 'mcq2' : 'mcq4';\n      reply = '👁️ **Eye of Horus Hint (For clarity and protection):**\\n' + maskAnswer(q.why, q.answer) +\n        '\\n\\n🛡️ I will not give away the answer yet! Look closely at the hint above and try one more time:\\n\\n' + fmtQuestion(q, opts);\n    } else {\n      resolved = true; p.streak = 0;\n      reply = '📘🤝 **Let us work it out together (Gradual Release):**\\nThe correct answer is **' + q.answer + '**.\\n💡 ' + q.why;\n      if (p.level > 0) {\n        p.level--;\n        reply += '\\n\\n🔽🪷 **Let us rebuild confidence at ' + TIERS[p.level] + ' with scaffolded choices.**';\n      }\n      memory = {\n        type: 'misconception', skill: bank, qid: q.id,\n        text: 'Misconception on ' + q.id + ' (' + bank + ', ' + TIERS[q.tier] + '): student chose \"' + chosen + '\" instead of \"' + q.answer + '\" even after a hint. Item: ' + q.prompt + ' Rationale: ' + q.why\n      };\n      kb = 'next';\n    }\n    if (resolved) {\n      p.total_answered++; p.set_answered++; p.mastery[bank].a++; p.attempt = 1; p.current_qid = null;\n      reply += '\\n\\n📊 **Set Progress:** ' + p.set_answered + '/' + SET + '\\n🏠 Tap /menu anytime to return to the Main Menu.';\n      if (p.set_answered >= SET) {\n        const pct = Math.round(100 * p.set_correct / p.set_answered);\n        const to = p.email || ''; const teacher = pl.teacher_email || '';\n        if (to || (pct < THRESH && teacher)) {\n          email = {\n            to: to || teacher, cc: (to && pct < THRESH) ? teacher : '',\n            subject: 'KEMET Mastery Report - ' + pct + '%' + (pct < THRESH ? ' (needs support)' : ''),\n            html: reportHtml(pct)\n          };\n        }\n        const notified = email && (email.to === teacher || email.cc === teacher) && teacher;\n        reply += '\\n\\n🏆 **5-Question Set Complete: ' + pct + '%!** ' +\n          (pct < THRESH ? 'Let us keep practising' + (notified ? ' (a summary has been sent to your teacher).' : '.') : 'Outstanding mastery!') +\n          '\\n\\n🔄 **Ready to switch topics?** Tap /topic or /reset to refresh my memory and start a new Study Sprint!';\n        p.set_answered = 0; p.set_correct = 0;\n      }\n    }\n  }\n} else {\n  const q = pts[Math.floor(Math.random() * pts.length)];\n  let o = shuffle(q.options);\n  if ((o.length !== 4 && o.length > 2) || (q.tier <= 1 && o.length > 2)) {\n    const wrong = shuffle(o.filter(function(x) { return x !== q.answer; }));\n    o = shuffle([q.answer, wrong[0]]);\n  }\n  p.current_qid = q.id; p.current_options = o; p.current_tier = q.tier; p.attempt = 1;\n  p.seen = (p.seen || []).concat([q.id]).slice(-500);\n  kb = o.length === 2 ? 'mcq2' : 'mcq4'; opts = o; qid = q.id;\n  reply = fmtQuestion(q, o);\n}\n\nreturn { json: { ...pl, reply_text: reply, keyboard_type: kb, options: opts, qid, profile: p, email_payload: email, memory_item: memory } };"
+      },
+      "id": "20bdc294-e2c2-4201-a6dc-e443a2e64e10",
+      "name": "Adaptive Quiz Engine",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        2304,
+        560
+      ]
+    },
+    {
+      "parameters": {
+        "mode": "runOnceForEachItem",
+        "jsCode": "const d = $input.item.json;\nconst p = JSON.parse(JSON.stringify(d.profile));\nconst cb = d.callback_data || '';\nconst raw = (cb === 'menu' ? '/menu' : (cb.startsWith('lvl:') ? '/level ' + cb.slice(4) : (d.text || ''))).trim();\n\nconst emailPattern = /^[^\\s@]+@[^\\s@]+\\.[^\\s@]+$/;\nconst isDirectEmail = emailPattern.test(raw);\n\nlet cmd = '';\nlet arg = '';\n\nif (isDirectEmail) {\n  cmd = '/email';\n  arg = raw;\n} else {\n  const parts = raw.split(/\\s+/);\n  cmd = (parts[0] || '').toLowerCase().split('@')[0];\n  if (!cmd.startsWith('/')) {\n    if (['guidebook', 'guide', 'doleel', 'دليل'].includes(cmd)) cmd = '/guidebook';\n    else if (['menu', 'stop', 'exit', 'رجوع', 'القائمة'].includes(cmd)) cmd = '/menu';\n    else cmd = '/start';\n  }\n  arg = parts.slice(1).join(' ').trim();\n}\n\nconst TIERS = ['🪷 Support (D1)', '🏛️ Foundation (Tier 1)', '⚖️ Apply (Tier 2)', '👑 Challenge (Tier 3)'];\nconst BANKS = ['V1', 'V2', 'R1', 'R2', 'P1', 'C1', 'C2', 'S1', 'L1', 'N1'];\n\nconst BANK_NAMES = {\n  D1: 'Diagnostic Support',\n  V1: 'Core Vocabulary (Health & Media)',\n  V2: 'Academic Vocabulary & Collocations',\n  R1: 'Relative Clauses (Who / Which / Whose)',\n  R2: 'Advanced Relative Clauses (Prepositions)',\n  P1: 'Participle Clauses & Dangling Participles',\n  C1: 'Conditionals & Hedging (Provided that / Unless)',\n  C2: 'Formal Conditional Inversions (Should / Were / Had)',\n  S1: 'Sentence Synthesis & Transformation',\n  L1: 'Reading & Listening Evidence (WHO & Egypt Survey)',\n  N1: 'The Lost World (Chapter 1)'\n};\n\nconst TOPIC_ALIASES = {\n  'vocab': 'V1', 'vocabulary': 'V1',\n  'relative': 'R1', 'clauses': 'R1',\n  'participle': 'P1', 'participles': 'P1',\n  'conditional': 'C1', 'conditionals': 'C1', 'hedging': 'C1',\n  'inversion': 'C2', 'inversions': 'C2',\n  'synthesis': 'S1', 'grammar': 'R1',\n  'reading': 'L1', 'listening': 'L1',\n  'novel': 'N1', 'lostworld': 'N1', 'challenger': 'N1'\n};\n\nconst help = [\n  '🧭 **Your Nile Flow Navigation Map:**',\n  '🎯 /quiz — Launch Adaptive Practice (330 Leveled Items)',\n  '✍️ /essay — Build your **JRE+** Paragraph step-by-step',\n  '📖 /guidebook — Get the Official Student Guidebook (PDF) by email',\n  '🎚️ /level — Switch Your Difficulty Tier (1, 2, 3, or support)',\n  '📚 /topic — Choose a new skill for your next Study Sprint',\n  '📊 /progress — View & Email Your Detailed Skill Mastery Dashboard',\n  '📧 Send your email directly anytime to save it for instant reports',\n  '🔄 /reset — Clear the desk for a new Study Sprint',\n  '🏠 /menu — Return to this Main Menu anytime',\n  '',\n  '🌐 **Explore the Complete KEMET Ecosystem:**',\n  'To get more engaged and immerse yourself in the full learning experience, explore the **KEMET Ecosystem** (Interactive Web Platform, Mobile App & Community Channels) using the buttons below! 👇',\n  '',\n  '💬 **Or simply ask me any question** about **Unit 1** or **The Lost World**!'\n].join('\\n');\n\nconst buildSummaryHtml = function(titleText, introText) {\n  const acc = p.total_answered ? Math.round(100 * p.total_correct / p.total_answered) : 0;\n  const entries = Object.entries(p.mastery || {}).filter(function(item) { return item[1] && item[1].a > 0; });\n  let rowsHtml = '<li>No practice questions completed yet — send <b>/quiz</b> on Telegram to begin!</li>';\n  if (entries.length > 0) {\n    rowsHtml = entries.map(function(item) {\n      const k = item[0];\n      const v = item[1];\n      const pct = Math.round(100 * v.c / v.a);\n      const label = BANK_NAMES[k] || k;\n      return '<li><b>' + label + ' (' + k + '):</b> ' + v.c + '/' + v.a + ' first-try correct (' + pct + '%)</li>';\n    }).join('');\n  }\n  return '<div style=\"font-family:Arial,sans-serif;max-width:580px;color:#12161F;border:1px solid #e0e0e0;border-radius:8px;padding:22px\">' +\n    '<h2 style=\"color:#167B80;margin-top:0\">🏺 ' + titleText + '</h2>' +\n    '<p style=\"color:#B8860B;font-style:italic;margin-top:0\">Like the Rosetta Stone preserving texts to unlock knowledge, we preserve your progress. 📜🗝️</p>' +\n    '<p>Hello <b>' + (p.name || 'Scholar') + '</b>,</p>' +\n    '<p>' + introText + '</p>' +\n    '<div style=\"background:#f4fbfb;padding:16px;border-radius:6px;margin:18px 0;border-left:4px solid #167B80\">' +\n      '<h3 style=\"margin-top:0;color:#167B80\">📊 Your Current Mastery Standing</h3>' +\n      '<p style=\"margin:4px 0\"><b>Current Readiness Tier:</b> ' + TIERS[p.level] + '</p>' +\n      '<p style=\"margin:4px 0\"><b>Active Skill Focus:</b> ' + (p.bank === 'ALL' ? 'All Unit 1 Skills' : (BANK_NAMES[p.bank] || p.bank)) + '</p>' +\n      '<p style=\"margin:4px 0\"><b>Overall First-Try Accuracy:</b> ' + acc + '% (' + p.total_correct + '/' + p.total_answered + ')</p>' +\n      '<h4 style=\"margin:12px 0 6px 0;color:#12161F\">Skill Bank Breakdown:</h4>' +\n      '<ul style=\"margin:0;padding-left:20px\">' + rowsHtml + '</ul>' +\n    '</div>' +\n    '<div style=\"background:#fdfcf7;border:1px dashed #d1c18d;border-radius:8px;padding:14px;margin:16px 0;text-align:center;\">' +\n      '<p style=\"margin:0;color:#167B80;font-weight:bold;\">📎 Attached to this email:</p>' +\n      '<p style=\"margin:4px 0 0 0;font-size:13px;color:#12161F;\">Your official <b>KEMET Student Guidebook (PDF)</b> is attached. Review the Eye of Horus rules, JRE+ writing models, and Unit 1 cheat-sheets offline!</p>' +\n    '</div>' +\n    '<h3 style=\"color:#167B80;margin-bottom:8px\">🧭 Quick Commands on Telegram</h3>' +\n    '<ul style=\"margin-top:0;padding-left:20px\">' +\n      '<li><b>/quiz</b> — Adaptive multiple-choice practice with <i>Eye of Horus</i> hints</li>' +\n      '<li><b>/essay</b> — Step-by-step JRE+ paragraph building</li>' +\n      '<li><b>/guidebook</b> — Request another copy of your Guidebook PDF</li>' +\n      '<li><b>/topic</b> — Focus on a specific grammar, vocabulary, or novel skill</li>' +\n      '<li><b>/level</b> — Switch between Support, Foundation, Apply, and Challenge</li>' +\n      '<li><b>/menu</b> — Pause and return to the Main Menu anytime</li>' +\n    '</ul>' +\n    \n    // KEMET Ecosystem Container\n    '<div style=\"background:#fdfcf7;border:1px dashed #d1c18d;border-radius:8px;padding:20px;margin-top:24px;text-align:center;\">' +\n      '<h4 style=\"color:#167B80;margin:0 0 8px 0;font-size:16px;\">🌐 Explore the Full KEMET Ecosystem</h4>' +\n      '<p style=\"color:#4a5568;font-size:13px;line-height:1.6;margin:0 0 16px 0;\">' +\n        'Immerse yourself deeper in the learning experience with interactive writing labs, live mastery analytics, visual guides, and our multimedia channels:' +\n      '</p>' +\n      \n      // Ecosystem Buttons\n      '<div style=\"margin-bottom:12px;\">' +\n        '<a href=\"https://glowing-tabletop-production.weweb.io/\" target=\"_blank\" style=\"background:#167B80;color:#ffffff;padding:10px 18px;border-radius:20px;text-decoration:none;font-weight:bold;font-size:13px;display:inline-block;margin:4px;\">' +\n          '🌊 Official Platform' +\n        '</a> ' +\n        '<a href=\"https://kemet-master-ancient-egyptian-scribe-gold-design.ai.studio/\" target=\"_blank\" style=\"background:#0E5356;color:#ffffff;padding:10px 18px;border-radius:20px;text-decoration:none;font-weight:bold;font-size:13px;display:inline-block;margin:4px;\">' +\n          '📱 Mobile App' +\n        '</a>' +\n      '</div>' +\n      \n      '<div style=\"margin-bottom:4px;\">' +\n        '<a href=\"https://www.youtube.com/@KemetTheNileFlow\" target=\"_blank\" style=\"background:#c4302b;color:#ffffff;padding:7px 14px;border-radius:16px;text-decoration:none;font-size:12px;display:inline-block;margin:3px;\">' +\n          '▶️ YouTube' +\n        '</a> ' +\n        '<a href=\"https://www.instagram.com/kemethenile/\" target=\"_blank\" style=\"background:#E1306C;color:#ffffff;padding:7px 14px;border-radius:16px;text-decoration:none;font-size:12px;display:inline-block;margin:3px;\">' +\n          '📸 Instagram' +\n        '</a> ' +\n        '<a href=\"https://www.facebook.com/people/Kemet-The-Nile-Flow/61595359775648/?mibextid=wwXIfr&rdid=l45Jc2MSuGOHcDiK&share_url=https%3A%2F%2Fwww.facebook.com%2Fshare%2F1CDMaxKF8q%2F%3Fmibextid%3DwwXIfr\" target=\"_blank\" style=\"background:#1877F2;color:#ffffff;padding:7px 14px;border-radius:16px;text-decoration:none;font-size:12px;display:inline-block;margin:3px;\">' +\n          '📘 Facebook' +\n        '</a>' +\n      '</div>' +\n    '</div>' +\n    '<p style=\"color:#a0aec0;font-size:11px;margin-top:18px;margin-bottom:4px;text-align:center;font-style:italic;\">⚠️ This is an automated notification from a no-reply address. Please do not reply directly to this email.</p>' +\n    '<p style=\"color:#888;font-size:11px;margin-top:4px;text-align:center;\">Protected by the Wings of Isis · KEMET: The Nile Flow Adaptive Socratic Tutor</p>' +\n  '</div>';\n};\n\nlet reply = '';\nlet emailPayload = null;\n\nswitch (cmd) {\n  case '/menu':\n  case '/stop':\n  case '/exit':\n    p.current_qid = null;\n    p.attempt = 1;\n    p.mode = 'chat';\n    reply = [\n      '⏸️🏺 **Activity Paused — Welcome Back to the Main Sanctuary!**',\n      'Like the lotus opening with the dawn, you can always renew your focus here. 🪷',\n      'Your progress and streak are safely stored in our golden treasures. ☀️🏆',\n      '🎖️ **Current Tier:** ' + TIERS[p.level] + ' | 📈 **Questions Practised:** ' + p.total_answered,\n      '',\n      help\n    ].join('\\n');\n    break;\n\n  case '/start':\n  case '/help':\n    p.current_qid = null;\n    p.mode = 'chat';\n    reply = (d.is_new || cmd === '/help')\n      ? [\n          '🏺✨ **Welcome' + (p.name ? ', ' + p.name : '') + ' to KEMET: THE BLACK LAND!** 🇪🇬',\n          'Like the rich dark soil of the Nile, let us nourish your English skills! 🌾💧',\n          '',\n          '👁️ **The Eye of Horus Promise (Healing & Clarity):**',\n          'I will never spoon-feed you answers. Instead, I guide you with **Socratic Hints** so you experience true Productive Struggle.',\n          '',\n          '🪽 **Protected by the Wings of Isis:**',\n          'My wings spread in protection and care. Currently tuned to: **' + TIERS[p.level] + '**',\n          '',\n          '🪷 **Study Sprints:**',\n          'Like the dawn lotus opening for renewal, use **/topic** or **/reset** to clear your mind and switch subjects!',\n          '',\n          help\n        ].join('\\n')\n      : [\n          '🏺🌟 **Welcome back to the Nile Flow' + (p.name ? ', ' + p.name : '') + '!** 🌊🇪🇬',\n          '🎖️ **Current Tier:** ' + TIERS[p.level] + ' | 📈 **Questions Practised:** ' + p.total_answered,\n          '',\n          '👁️ Ready for your next Study Sprint?',\n          '',\n          help\n        ].join('\\n');\n    break;\n\n  case '/guidebook':\n  case '/guide':\n    if (p.email) {\n      emailPayload = {\n        to: p.email,\n        cc: '',\n        subject: '📖 KEMET: The Nile Flow — Official Student Guidebook (PDF)',\n        html: buildSummaryHtml(\n          'Official Student Guidebook',\n          'Here is your requested <b>KEMET Student Guidebook (PDF)</b>! We have attached the full document to this email so you can review the <i>Eye of Horus</i> hints, JRE+ essay rules, and Unit 1 curriculum notes anytime offline. 📜✨'\n        )\n      };\n      reply = [\n        '📖✨ **Your Guidebook is on its way!**',\n        'I have just sent the **Official Student Guidebook (PDF)** to your registered email: **' + p.email + '**.',\n        '',\n        '📎 Check your inbox for the attachment! It includes all the hint rules, writing steps, and Unit 1 cheat-sheets.',\n        '🎯 Tap /quiz to start practicing, or /menu for the Main Menu.'\n      ].join('\\n');\n    } else {\n      p.awaiting_email_for = 'guidebook';\n      reply = [\n        '📖🏺 **KEMET Official Student Guidebook**',\n        'I would love to send you the complete 4-page Guidebook (PDF) with all the rubrics, grammar cheat-sheets, and hint rules!',\n        '',\n        '📧 **Please reply with your email address** (e.g. scholar@example.com):',\n        '',\n        '🏠 Or tap /menu anytime to cancel.'\n      ].join('\\n');\n    }\n    break;\n\n  case '/level': {\n    const m = { 'support': 0, 'd1': 0, '0': 0, '1': 1, 'foundation': 1, '2': 2, 'apply': 2, '3': 3, 'challenge': 3 };\n    const v = m[arg.toLowerCase()];\n    if (v === undefined) {\n      reply = [\n        '🎚️ **Choose Your Readiness Tier:**',\n        '• /level support — 🪷 **Support (D1):** Guided 2-choice scaffolding',\n        '• /level 1 — 🏛️ **Foundation:** Core concepts & definitions',\n        '• /level 2 — ⚖️ **Apply:** Standard Grade 11 exam application',\n        '• /level 3 — 👑 **Challenge:** Higher-order analysis & inversions',\n        '',\n        '🏠 Tap /menu anytime to return to the Main Menu.'\n      ].join('\\n');\n    } else {\n      p.level = v; p.streak = 0; p.attempt = 1; p.current_qid = null;\n      reply = '🎚️✨ Readiness tier updated to **' + TIERS[v] + '**!\\n\\n🎯 Tap /quiz to begin your sprint, or /menu for the Main Menu.';\n    }\n    break;\n  }\n\n  case '/topic': {\n    const cleanArg = arg.toLowerCase().trim();\n    const b = TOPIC_ALIASES[cleanArg] || arg.toUpperCase().trim();\n    if (b === 'ALL' || BANKS.includes(b)) {\n      p.bank = b; p.current_qid = null;\n      const label = b === 'ALL' ? '🌍 All Unit 1 Skills' : (BANK_NAMES[b] + ' (' + b + ')');\n      reply = '📚✨ Topic focus locked to **' + label + '**!\\n\\n🎯 Tap /quiz to start practising this skill, or /menu for the Main Menu.';\n    } else {\n      const topicList = BANKS.map(function(code) { return '• /topic ' + code + ' — **' + BANK_NAMES[code] + '**'; }).join('\\n');\n      reply = [\n        '📚 **Choose a Skill Topic to Focus On:**',\n        '• /topic ALL — 🌍 **Practice All Unit 1 Skills Together**',\n        topicList,\n        '',\n        '💡 Tip: You can also type natural names like **/topic vocab**, **/topic conditionals**, or **/topic novel**!',\n        '🏠 Tap /menu anytime to return to the Main Menu.'\n      ].join('\\n');\n    }\n    break;\n  }\n\n  case '/essay':\n    p.mode = 'essay_builder'; p.current_qid = null;\n    reply = [\n      '✍️📜 **JRE+ Step-by-Step Builder**',\n      '',\n      '❓ **Driving Inquiry Question:**',\n      'To what extent should schools share responsibility for student well-being?',\n      '',\n      'Let\\'s build your 150-word paragraph together, one piece at a time!',\n      '',\n      'First, send me your **J (Justification)** sentence. State a clear, debatable claim about the question above. (Tip: avoid absolute words like always or everyone).',\n      '',\n      '🏠 Or tap /menu anytime to cancel and return to the Main Menu.'\n    ].join('\\n');\n    break;\n\n  case '/email': {\n    const targetEmail = isDirectEmail ? raw : arg;\n    if (emailPattern.test(targetEmail)) {\n      p.email = targetEmail;\n\n      const requestedGuidebook = p.awaiting_email_for === 'guidebook';\n      p.awaiting_email_for = null;\n\n      emailPayload = {\n        to: targetEmail,\n        cc: '',\n        subject: requestedGuidebook \n          ? '📖 KEMET: The Nile Flow — Official Student Guidebook (PDF)' \n          : '🏺 Welcome to KEMET: The Nile Flow — Your Mastery & Study Guide',\n        html: buildSummaryHtml(\n          requestedGuidebook ? 'Official Student Guidebook' : 'Welcome to KEMET: The Nile Flow!',\n          requestedGuidebook\n            ? 'Thank you for providing your email! We have attached the <b>KEMET Student Guidebook (PDF)</b> to this email. You will also receive automated mastery reports after every 5-question set.'\n            : 'Your email has been successfully linked to your KEMET Socratic Tutor profile! You will now receive automatic mastery reports after every 5-question practice set. We have also attached your official Guidebook PDF!'\n        )\n      };\n\n      reply = requestedGuidebook\n        ? [\n            '📧✅ **Email saved (' + targetEmail + ')!**',\n            '🚀 I have just emailed your **Official Student Guidebook (PDF)** to your inbox!',\n            '📊 Your email is now linked, and you will receive regular mastery summaries.',\n            '',\n            '🎯 Tap /quiz to test your skills, or /menu for the Main Menu.'\n          ].join('\\n')\n        : [\n            '📧✅ **Email saved (' + targetEmail + ')!**',\n            '🚀 I have just sent a **Welcome & Current Progress Report** (with Guidebook attached) straight to your inbox!',\n            '📊 Going forward, I will also email your **Mastery Reports** after every 5-question set.',\n            '',\n            '🎯 Tap /quiz to practise, /progress to view your stats, or /menu for the Main Menu.'\n          ].join('\\n');\n    } else {\n      reply = '📧 Please enter a valid email address (e.g. name@example.com).\\n\\n🏠 Tap /menu to return to the Main Menu.';\n    }\n    break;\n  }\n\n  case '/progress': {\n    const acc = p.total_answered ? Math.round(100 * p.total_correct / p.total_answered) : 0;\n    const entries = Object.entries(p.mastery || {}).filter(function(item) { return item[1] && item[1].a > 0; });\n    let banksText = 'No questions completed yet — tap /quiz to start!';\n    let tipText = '🎯 Tap /quiz to keep your Nile Flow streak alive, or /menu for the Main Menu! 🌊';\n\n    if (entries.length > 0) {\n      entries.sort(function(a, b) { return (b[1].c / b[1].a) - (a[1].c / a[1].a); });\n      banksText = entries.map(function(item) {\n        const k = item[0];\n        const v = item[1];\n        const pct = Math.round(100 * v.c / v.a);\n        const icon = pct >= 80 ? '🌟' : (pct >= 50 ? '📈' : '🛠️');\n        const name = BANK_NAMES[k] || k;\n        return '• ' + icon + ' **' + name + ' (' + k + '):** ' + v.c + '/' + v.a + ' (' + pct + '%)';\n      }).join('\\n');\n\n      const weakest = entries[entries.length - 1];\n      const weakCode = weakest[0];\n      const weakPct = Math.round(100 * weakest[1].c / weakest[1].a);\n      if (weakPct < 80) {\n        tipText = '💡 **Eye of Horus Tip:** Your biggest growth area is **' + (BANK_NAMES[weakCode] || weakCode) + ' (' + weakPct + '%)**. Type **/topic ' + weakCode + '** to practice it directly!\\n🏠 Tap /menu anytime for the Main Menu.';\n      }\n    }\n\n    if (p.email) {\n      emailPayload = {\n        to: p.email,\n        cc: '',\n        subject: '📊 KEMET Live Mastery Report — ' + acc + '% Overall Accuracy',\n        html: buildSummaryHtml(\n          'KEMET: The Nile Flow — Live Mastery Report',\n          'Here is the on-demand Mastery & Skill Breakdown report you requested on Telegram. We have also attached your official Guidebook PDF!'\n        )\n      };\n    }\n\n    reply = [\n      '📊🏺 **Your KEMET Mastery Dashboard**',\n      'Shining with the gleam of gold and immortality! ☀️🏆',\n      '',\n      '🎖️ **Current Tier:** ' + TIERS[p.level],\n      '🎯 **Active Focus:** ' + (p.bank === 'ALL' ? '🌍 All Unit 1 Skills' : (BANK_NAMES[p.bank] || p.bank)),\n      '🔥 **Active Streak:** ' + p.streak + ' in a row',\n      '✅ **Overall First-Try Accuracy:** ' + acc + '% (' + p.total_correct + '/' + p.total_answered + ')',\n      '',\n      '📚 **Skill Breakdown (First-Try Correct):**',\n      '(🌟 Mastered ≥80% | 📈 Growing 50–79% | 🛠️ Needs Practice <50%)',\n      banksText,\n      '',\n      (p.email ? '📧 *A copy of this report (with your Guidebook PDF attached) was sent to ' + p.email + '!*\\n' : '💡 Tip: Type **/guidebook** or send your email to get your study report & PDF sent to your inbox!\\n'),\n      tipText\n    ].join('\\n');\n    break;\n  }\n\n  case '/reset':\n    Object.assign(p, { level: 2, bank: 'ALL', mode: 'chat', streak: 0, attempt: 1, current_qid: null, current_options: [], set_answered: 0, set_correct: 0 });\n    reply = '🔄🪷 **Fresh Study Sprint on the Nile!**\\nLike the dawn lotus, your focus is renewed. Your context is cleared so we can focus sharply on a new topic, but your past question history is still saved! Your profile is ready at **⚖️ Apply (Tier 2)**.\\n\\n🎯 Tap /topic to pick a new skill, or /quiz to begin!';\n    break;\n\n  default:\n    reply = '🏺 I did not recognise that command.\\n\\n' + help;\n}\n\nreturn { json: { ...d, reply_text: reply, keyboard_type: 'text', options: [], qid: null, profile: p, email_payload: emailPayload, memory_item: null } };"
+      },
+      "id": "7748b7da-c8e6-455c-8eab-a6db1d90b5a5",
+      "name": "Command Handler",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        2304,
+        752
+      ]
+    },
+    {
+      "parameters": {
+        "promptType": "define",
+        "text": "={{ $json.text }}",
+        "options": {
+          "systemMessage": "=ROLE\nYou are Kemet (🏺), the warm, encouraging Socratic English Tutor of \"Kemet: The Nile Flow\" for Egyptian Baccalaureate Grade 11. Your scope is Unit 1 (\"Living Well in a Complex World\") and Chapter 1 of \"The Lost World\".\n\n==ESSAY BUILDER MODE (CRITICAL)\nIf the student is currently building their JRE+ paragraph:\n1. Identify which step they are on (J, R, E, or + Grammar). \n2. Evaluate their submitted sentence. If it has flaws (e.g., absolutes in J, lack of logic in R, inaccurate facts in E, missing clauses in +), ask ONE Socratic question to help them fix it. Do NOT rewrite it for them.\n3. If their sentence is good, enthusiastically praise it, and explicitly ask them to write the next letter in the sequence! (e.g., \"Excellent Justification! 🌟 Now, what is your R (Reasoning) sentence to explain why?\")\n4. Once all 4 steps are complete, congratulate them on finishing their paragraph and tell them to type /menu to return to the main menu.\n\n==SYSTEM IDENTITY & PROJECT KNOWLEDGE\nYou were created by \"The Rosetta Trio\" (Dr. Mai Abualfotouh, Ms. Riham Khafagy, and Mr. Usama Azzam) as the Capstone Project for the Digital Egypt Pioneers Initiative (DEPI). \nYou operate on an n8n event-driven workflow, using Qdrant for vector memory and Google Gemini for cognitive reasoning. You adapt to the student's level (Support, Foundation, Apply, Challenge).\n\n==OBJECTIVE\nHelp the student discover answers using Gradual Release. If the student asks for a study plan, list the 4 core areas of Unit 1 (1. Vocabulary, 2. Grammar, 3. Reading Evidence, 4. The Lost World Ch. 1), and ask which one they want to explore!\n\n==FREE SPEECH & CONVERSATIONAL STEERING\nIf the student engages in casual chat or topics unrelated to English study:\n1. Acknowledge their statement warmly, tying it gently to Kemet/Nile motifs.\n2. IMMEDIATELY redirect the conversation back to the educational track. \n3. Explicitly prompt them to resume learning: \"Shall we return to our study sprint? Tap /quiz to test your skills, /topic to pick a new skill, or /essay to practice writing! 🪷\"\n\n==VERIFIED UNIT 1 KNOWLEDGE BASE\n1. Highlight-Reel Effect: APA (2023) found teens spending 3+ hours daily on image-based platforms are twice as likely to report low self-esteem. (\"Twice as likely\" proves correlation, NOT causation).\n2. WHO & Physical Activity: WHO (2019) recommends 60+ minutes of daily moderate activity. Over 80% of teens worldwide miss this. 10 minutes of daily mindfulness lowers stress hormones.\n3. Health Responsibility: (a) Bandura's Self-Efficacy = belief in one's ability. (b) Structural barriers = environmental obstacles (unsafe parks). (c) Nudge Theory (Richard Thaler) = reshaping the environment to make healthy choices easier.\n4. Egyptian School Health Survey (2023): 68% reported high exam stress. Regular exercise was linked to a 34% lower stress level. School counseling access: 74% urban vs. 31% rural.\n5. Unit 1 Grammar:\n   - Relative Clauses: who/whom, which, whose+noun. Never repeat the object pronoun.\n   - Participle Clauses: active (-ing), passive (V3). Avoid Dangling Participles.\n   - Inversions: \"Should + subj + base verb\"; \"Were + subj + complement\"; \"Had + subj + V3\". Hedging: may, might, provided that, unless.\n6. The Lost World (Chapter 1): Edward Malone loves Gladys Hungerton (who wants a brave man of action). Malone asks Mr. McArdle for a dangerous mission and is sent to interview Professor Challenger.\n\n==CONSTRAINTS\n1. Never give away a direct homework answer or write an essay. Give an \"👁️ Eye of Horus Hint\", then ask ONE guiding Socratic question.\n2. Reply in the language the student writes in (English or Arabic). Keep replies concise (under 130 words).\n\nSTUDENT PROFILE\nName: {{ $json.profile.name || 'Scholar' }} | Tier: {{ ['Support (D1)','Foundation','Apply','Challenge'][$json.profile.level] }}",
+          "maxIterations": 5
+        }
+      },
+      "id": "a75fbd49-c73d-4062-b0da-be9e6ca08f05",
+      "name": "Socratic Tutor Agent",
+      "type": "@n8n/n8n-nodes-langchain.agent",
+      "typeVersion": 1.7,
+      "position": [
+        1952,
+        1008
+      ],
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "options": {
+          "temperature": 0.4,
+          "safetySettings": {
+            "values": [
+              {
+                "category": "HARM_CATEGORY_HARASSMENT",
+                "threshold": "BLOCK_NONE"
+              },
+              {
+                "category": "HARM_CATEGORY_HATE_SPEECH",
+                "threshold": "BLOCK_NONE"
+              },
+              {
+                "category": "HARM_CATEGORY_SEXUALLY_EXPLICIT",
+                "threshold": "BLOCK_NONE"
+              },
+              {
+                "category": "HARM_CATEGORY_DANGEROUS_CONTENT",
+                "threshold": "BLOCK_NONE"
+              }
+            ]
+          }
+        }
+      },
+      "id": "26d47ec7-ed10-4464-a7ad-070c217b6880",
+      "name": "Gemini Chat (Tutor)",
+      "type": "@n8n/n8n-nodes-langchain.lmChatGoogleGemini",
+      "typeVersion": 1,
+      "position": [
+        1968,
+        1232
+      ],
+      "credentials": {
+        "googlePalmApi": {
+          "id": "Mxxl3YyGQJf0Wy8R",
+          "name": "Google Gemini(PaLM) Api account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "sessionIdType": "customKey",
+        "sessionKey": "={{ $('Merge Profile').first().json.student_id }}",
+        "contextWindowLength": 30
+      },
+      "id": "378676b1-6ad6-495b-a12a-ec4d6fc2883a",
+      "name": "Short-Term Memory (per student)",
+      "type": "@n8n/n8n-nodes-langchain.memoryBufferWindow",
+      "typeVersion": 1.3,
+      "position": [
+        2096,
+        1232
+      ]
+    },
+    {
+      "parameters": {
+        "mode": "runOnceForEachItem",
+        "jsCode": "const base = $('Wings of Isis Guardrail').first().json;\nconst o = $input.item.json || {};\nconst ok = typeof o.output === 'string' && o.output.trim().length > 0;\nconst q = String(base.text || '').toLowerCase();\nconst mode = base.profile.mode || 'chat';\n\nlet fallbackReply = '';\n\nif (mode === 'essay_builder' && !ok) {\n  // If Gemini fails while building the essay, trigger this specific message instead of the main menu.\n  fallbackReply = '🪽 It looks like your thought was incomplete or the AI connection timed out! Please finish your sentence and send it again so we can review your step.';\n} else if (/(lost world|malone|gladys|challenger|mcardle|novel|chapter|story|1\\b.*3|3\\b)/.test(q)) {\n  fallbackReply = [\n    '🦖📖 **The Lost World — Chapter 1: A Dream of Adventure**',\n    '',\n    'In Chapter 1, **Edward Malone** (a 23-year-old reporter at the *Daily Gazette* in London) proposes to **Gladys Hungerton**. However, Gladys says she can only love a brave man of action who faces real danger as part of his character—not someone who merely seeks safety.',\n    '',\n    'Determined to prove himself, Malone asks his editor, **Mr. McArdle**, for a dangerous mission. McArdle sends him to interview the hot-tempered zoologist **Professor George Edward Challenger**, who claims to have discovered living prehistoric creatures in South America. Using a clever trick suggested by **Tarp Henry**, Malone writes a letter pretending to be a sympathetic student to get inside Challenger\\'s house.',\n    '',\n    '👁️ **Eye of Horus Socratic Question:**',\n    'Do you think Gladys Hungerton\\'s view of bravery is fair to Edward Malone, or is she encouraging reckless behavior? Why?'\n  ].join('\\n');\n\n} else if (/(relative|who|whom|which|whose|pronoun)/.test(q)) {\n  fallbackReply = [\n    '🏛️📐 **Unit 1 Grammar: Relative Clauses**',\n    '',\n    'Here is the golden rule of **Relative Clauses** (Gradual Release — *I Do*):',\n    '• **who / whom** → for people (*\"The counselor **who** helped me...\"*)',\n    '• **which** → for things/studies (*\"The survey **which** we read...\"*)',\n    '• **whose + noun** → for possession (*\"A student **whose** sleep is regular...\"*)',\n    '• ⚠️ **Common Trap:** Never repeat the object pronoun!',\n    '  ❌ *The article which I read **it** was useful.*',\n    '  ✅ *The article which I read was useful.*',\n    '',\n    '👁️ **Eye of Horus Socratic Question (*You Do*):**',\n    'How would you combine these two sentences into ONE using **whose**:',\n    '*\"I met a student. His brother is a school counselor.\"*'\n  ].join('\\n');\n\n} else if (/(participle|dangling|walking|having)\\b/.test(q)) { \n  fallbackReply = [\n    '🏛️📐 **Unit 1 Grammar: Participle Clauses & Dangling Participles**',\n    '',\n    'When a sentence starts with a **participle phrase** (*Walking to school,...* or *Having finished the exam,...*), the **subject right after the comma** MUST be the person doing that action!',\n    '• ❌ **Dangling:** *Walking to school, the rain started.* (The rain wasn\\'t walking!)',\n    '• ✅ **Correct:** *Walking to school, **I** felt the rain start.*',\n    '',\n    '👁️ **Eye of Horus Socratic Question:**',\n    'What is wrong with this sentence, and how can you fix it?',\n    '*\"Scrolling through Instagram late at night, my sleep quality dropped.\"*'\n  ].join('\\n');\n\n} else if (/(conditional|inversion|should|were|had|provided|unless|hedg)/.test(q)) {\n  fallbackReply = [\n    '🏛️📐 **Unit 1 Grammar: Conditionals, Inversions & Hedging**',\n    '',\n    'In formal academic writing, we can invert conditional sentences by dropping **\"if\"** and moving the auxiliary verb to the front:',\n    '• **1st Conditional:** *If you feel stressed...* → **Should you feel** stressed, talk to a counselor.',\n    '• **2nd Conditional:** *If I were in your position...* → **Were I** in your position, I would rest.',\n    '• **3rd Conditional:** *If I had slept earlier...* → **Had I slept** earlier, I would have focused better.',\n    '',\n    '👁️ **Eye of Horus Socratic Question:**',\n    'How would you rewrite *\"If schools were to offer healthier lunches, students might eat better\"* using a formal **Were** inversion?'\n  ].join('\\n');\n\n} else if (/(highlight|reel|social media|instagram|tiktok|self-esteem|causation|correlation)/.test(q)) {\n  fallbackReply = [\n    '📱🪞 **Lesson 1: Social Media & The Highlight-Reel Effect**',\n    '',\n    'Research by the **APA (2023)** and **JAMA Psychiatry** found that teenagers spending **over 3 hours daily** on image-based platforms are **twice as likely** to report low self-esteem compared to those using them under 1 hour.',\n    '• **The Highlight-Reel Effect:** People post only filtered, perfect moments while hiding everyday struggles.',\n    '• **Critical Thinking Key:** *\"Twice as likely\"* shows **correlation (association)**, NOT proven **causation**!',\n    '',\n    '👁️ **Eye of Horus Socratic Question:**',\n    'Why can\\'t we say social media *directly causes* low self-esteem from this study alone? Could another factor explain why unhappy teens scroll more?'\n  ].join('\\n');\n\n} else if (/(barrier|structural|nudge|thaler|bandura|efficacy|agency|responsibility)/.test(q)) {\n  fallbackReply = [\n    '⚖️🍎 **Reading B: Agency, Structural Barriers & Nudge Theory**',\n    '',\n    'Unit 1 explores **three perspectives** on who is responsible for healthy living:',\n    '1. **Personal Agency (Bandura):** *Self-efficacy* is your belief in your own ability to build healthy habits.',\n    '2. **Structural Barriers:** Unsafe parks or expensive healthy food are environmental obstacles—not a lack of willpower.',\n    '3. **Nudge Theory (Richard Thaler):** Reshaping the environment (like placing fruit at eye level in a school cafeteria) makes healthy choices easier without banning anything.',\n    '',\n    '👁️ **Eye of Horus Socratic Question:**',\n    'Can high self-efficacy alone overcome a structural barrier like having no safe place to exercise? What is one \"nudge\" your school could use?'\n  ].join('\\n');\n\n} else if (/(who|survey|egypt|stress|sleep|exercise|endorphin|mindfulness|1\\b|vocab|reading)/.test(q)) {\n  fallbackReply = [\n    '📊🏃 **Unit 1 Evidence: WHO & The 2023 Egyptian School Health Survey**',\n    '',\n    'Here are the key statistics for your quizzes and JRE+ essays:',\n    '• **WHO (2019):** Recommends **60 mins** of daily physical activity (releases **endorphins**), yet **over 80%** of teens worldwide miss this due to **sedentary** habits.',\n    '• **Sleep:** Teens need **8–10 hours** (<7 hours is linked to anxiety).',\n    '• **2023 Egypt Survey (450 teens):** **68%** reported high exam stress. Regular exercise (30+ mins, 4x/week) was linked to a **34% lower stress level**. Counseling access was **74% urban vs. 31% rural**.',\n    '',\n    '👁️ **Eye of Horus Socratic Question:**',\n    'Which of these statistics would best support an argument that schools should build physical activity into the daily timetable?'\n  ].join('\\n');\n\n} else if (/(jre|essay|paragraph|write|writing|4\\b)/.test(q)) {\n  fallbackReply = [\n    '✍️📜 **Mastering the 5-Sentence JRE+ Paragraph**',\n    '',\n    'To score **4/4 (Exemplary)** on your Unit 1 essay, structure your paragraph like this:',\n    '• **J (Justification):** A clear, debatable claim using hedging (*may, can, often*) instead of absolutes (*always, everyone*).',\n    '• **R (Reasoning):** Logical explanation + acknowledge **1 counter-view** (*Although personal willpower matters...*).',\n    '• **E (Evidence):** Cite a specific Unit 1 fact (e.g., the 2023 Egypt Survey or WHO study).',\n    '• **+ (Grammar & Action):** Use **1 relative clause**, **1 participle phrase**, and **conditional hedging** (*provided that*).',\n    '',\n    '👁️ **Eye of Horus Socratic Question:**',\n    'Want to try writing your **J (Justification)** sentence right now, or type **/essay** to submit a full paragraph for grading?'\n  ].join('\\n');\n\n} else {\n  fallbackReply = [\n    '🏺✨ **I would love to help you study Unit 1!** Reply with the name or number of any topic below and we will dive right in:',\n    '',\n    '1️⃣ **Vocabulary & Reading:** Type **\"Highlight-Reel\"**, **\"Nudge Theory\"**, or **\"Egypt Survey\"**',\n    '2️⃣ **Grammar Mastery:** Type **\"Relative Clauses\"**, **\"Participles\"**, or **\"Conditionals\"**',\n    '3️⃣ **Novel Study:** Type **\"The Lost World\"**, **\"Malone\"**, or **\"Challenger\"**',\n    '4️⃣ **Essay Coaching:** Type **\"JRE\"** (or tap **/essay** to grade a paragraph)',\n    '',\n    '👁️ **Or tap /quiz to test yourself with interactive questions!**'\n  ].join('\\n');\n}\n\nconst coreReply = ok ? o.output.trim() : fallbackReply;\nconst reply = coreReply + '\\n\\n──────────\\n🏠 Tap /menu or the button below anytime for the Main Menu.';\n\nconst memory = (ok && base.text.length > 25)\n  ? { type: 'episode', skill: 'socratic', qid: '', text: 'Student asked: ' + base.text.slice(0, 300) + ' | Tutor guided with: ' + coreReply.slice(0, 300) }\n  : null;\n\nreturn { json: { ...base, reply_text: reply, keyboard_type: 'text', options: [], qid: null, profile: base.profile, email_payload: null, memory_item: memory } };"
+      },
+      "id": "206fe73e-7d3d-4e33-918f-07e73464ee1b",
+      "name": "Format Socratic Reply",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        2304,
+        1008
+      ]
+    },
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "kemet-tutor",
+        "responseMode": "responseNode",
+        "options": {
+          "allowedOrigins": "*"
+        }
+      },
+      "id": "5892ad38-2c21-4966-8f8d-31a501a6fff2",
+      "name": "Web Portal Webhook",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [
+        32,
+        608
+      ],
+      "webhookId": "4f58c4b0-294c-42a0-86af-c288e8d3a3b3"
+    },
+    {
+      "parameters": {},
+      "id": "ca0d83f5-a36a-48bf-8fb3-31cf8e36608c",
+      "name": "Run Once: Setup & Ingest Knowledge",
+      "type": "n8n-nodes-base.manualTrigger",
+      "typeVersion": 1,
+      "position": [
+        32,
+        1232
+      ]
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "6b152184-2f25-4d45-b830-6d1df90532d6",
+              "name": "qdrant_url",
+              "value": "https://16521be8-e6ba-4636-a06a-3676bb90786d.eu-west-1-0.aws.cloud.qdrant.io",
+              "type": "string"
+            },
+            {
+              "id": "e5e2464d-9375-494d-8da1-0e16059b84dc",
+              "name": "bank_path",
+              "value": "/files/kemet_question_bank.json",
+              "type": "string"
+            },
+            {
+              "id": "143a57ca-fd31-4ffe-b64c-cc3c34692447",
+              "name": "knowledge_path",
+              "value": "/files/kemet_unit1_knowledge.json",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "64647c0b-abe9-4d72-b8f1-1d989665b56a",
+      "name": "Setup Config",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        256,
+        1232
+      ]
+    },
+    {
+      "parameters": {
+        "method": "PUT",
+        "url": "={{ $json.qdrant_url }}/collections/kemet_student_profiles",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "qdrantApi",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={ \"vectors\": { \"size\": 1, \"distance\": \"Dot\" } }",
+        "options": {}
+      },
+      "id": "b18441c1-8a84-4959-a129-e129ff29e0f0",
+      "name": "Create Profiles Collection",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        480,
+        1232
+      ],
+      "credentials": {
+        "qdrantApi": {
+          "id": "aDfzW7xM3VLVYCRB",
+          "name": "Qdrant account"
+        }
+      },
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "jsCode": "const arr = [\n  // --- TIER 0: Diagnostic Support (D1) ---\n  {\n    id: \"D1-01\",\n    bank: \"D1\",\n    level: \"Support\",\n    prompt: \"Choose the correct word: The teacher [who / which] helps me is kind.\",\n    options: [\"who\", \"which\"],\n    answer: \"who\",\n    why: \"Use 'who' for a person doing the action in a relative clause.\"\n  },\n  {\n    id: \"D1-02\",\n    bank: \"D1\",\n    level: \"Support\",\n    prompt: \"Choose the correct word: The book [who / which] is on the desk is mine.\",\n    options: [\"who\", \"which\"],\n    answer: \"which\",\n    why: \"Use 'which' for inanimate objects/things in a relative clause.\"\n  },\n  {\n    id: \"D1-03\",\n    bank: \"D1\",\n    level: \"Support\",\n    prompt: \"Choose the correct word: The boy [playing / played] football is my brother.\",\n    options: [\"playing\", \"played\"],\n    answer: \"playing\",\n    why: \"The boy performs the active action, so we use the present participle (-ing).\"\n  },\n  {\n    id: \"D1-04\",\n    bank: \"D1\",\n    level: \"Support\",\n    prompt: \"Choose the correct word: [Feeling / Felt] exhausted, Omar went to sleep early.\",\n    options: [\"Feeling\", \"Felt\"],\n    answer: \"Feeling\",\n    why: \"Omar experienced the feeling himself, so the active -ing participle introduces the sentence.\"\n  },\n  {\n    id: \"D1-05\",\n    level: \"Support\",\n    bank: \"D1\",\n    prompt: \"Choose the correct word: If I were you, I [will / would] ask the school counselor.\",\n    options: [\"will\", \"would\"],\n    answer: \"would\",\n    why: \"Second-conditional advice ('If I were you') requires 'would' + base verb.\"\n  },\n\n  // --- TIER 1: Foundation (Core Concepts & Vocabulary) ---\n  {\n    id: \"V1-01\",\n    bank: \"V1\",\n    level: \"Foundation\",\n    prompt: \"A period of ten years is called a ___.\",\n    options: [\"survey\", \"decade\", \"platform\", \"symptom\"],\n    answer: \"decade\",\n    why: \"A decade refers specifically to a duration of ten years.\"\n  },\n  {\n    id: \"V1-02\",\n    bank: \"V1\",\n    level: \"Foundation\",\n    prompt: \"A ___ lifestyle involves excessive sitting and minimal physical exertion.\",\n    options: [\"active\", \"balanced\", \"sedentary\", \"targeted\"],\n    answer: \"sedentary\",\n    why: \"A sedentary lifestyle describes inactive routines with low energy expenditure.\"\n  },\n  {\n    id: \"R1-01\",\n    bank: \"R1\",\n    level: \"Foundation\",\n    prompt: \"I spoke to a student ___ brother works as an adolescent counselor.\",\n    options: [\"who\", \"whom\", \"which\", \"whose\"],\n    answer: \"whose\",\n    why: \"Whose shows possessive relationship directly before a noun.\"\n  },\n  {\n    id: \"P1-01\",\n    bank: \"P1\",\n    level: \"Foundation\",\n    prompt: \"Which sentence is grammatically correct?\",\n    options: [\n      \"The survey which I read was useful.\",\n      \"The survey which I read it was useful.\",\n      \"The survey which read I was useful.\",\n      \"The survey I which read was useful.\"\n    ],\n    answer: \"The survey which I read was useful.\",\n    why: \"The relative pronoun replaces the object; repeating 'it' is an error.\"\n  },\n  {\n    id: \"C1-01\",\n    bank: \"C1\",\n    level: \"Foundation\",\n    prompt: \"If I ___ in your position, I would limit my evening screen time.\",\n    options: [\"were\", \"am\", \"will be\", \"had been\"],\n    answer: \"were\",\n    why: \"Formal hypothetical second-conditional advice uses 'If I were'.\"\n  },\n  {\n    id: \"L1-01\",\n    bank: \"L1\",\n    level: \"Foundation\",\n    prompt: \"According to the WHO (2019), how many minutes of daily physical activity do adolescents need?\",\n    options: [\"20 minutes\", \"30 minutes\", \"60 minutes\", \"90 minutes\"],\n    answer: \"60 minutes\",\n    why: \"The WHO guidelines recommend at least 60 minutes of daily moderate-to-vigorous exercise.\"\n  },\n\n  // --- TIER 2: Apply (Exam Level Application) ---\n  {\n    id: \"V1-11\",\n    bank: \"V1\",\n    level: \"Apply\",\n    prompt: \"According to Bandura, a person's belief in their capability to execute behaviors to achieve goals is ___.\",\n    options: [\"self-esteem\", \"social comparison\", \"self-efficacy\", \"dissatisfaction\"],\n    answer: \"self-efficacy\",\n    why: \"Bandura defines self-efficacy as belief in one's personal capability to succeed.\"\n  },\n  {\n    id: \"R1-11\",\n    bank: \"R1\",\n    level: \"Apply\",\n    prompt: \"Select the sentence that correctly uses a formal fronted preposition:\",\n    options: [\n      \"The counselor with whom I met was supportive.\",\n      \"The counselor with who I met was supportive.\",\n      \"The counselor which I met with was supportive.\",\n      \"The counselor whose I met with was supportive.\"\n    ],\n    answer: \"The counselor with whom I met was supportive.\",\n    why: \"After a fronted preposition referring to a person, formal English requires 'whom'.\"\n  },\n  {\n    id: \"P1-11\",\n    bank: \"P1\",\n    level: \"Apply\",\n    prompt: \"Which sentence correctly avoids a dangling participle?\",\n    options: [\n      \"Walking to school, the rain started.\",\n      \"Walking to school, I felt the rain start.\",\n      \"Walking to school, my umbrella was forgotten.\",\n      \"Having walked to school, the bell was ringing.\"\n    ],\n    answer: \"Walking to school, I felt the rain start.\",\n    why: \"The subject immediately following the introductory participle phrase must be the person doing the action ('I').\"\n  },\n  {\n    id: \"C2-11\",\n    bank: \"C2\",\n    level: \"Apply\",\n    prompt: \"Which option represents the correct formal inversion for 'If I were you, I would rest'?\",\n    options: [\n      \"Were I you, I would rest.\",\n      \"Was I you, I would rest.\",\n      \"Did I were you, I would rest.\",\n      \"If were I you, I would rest.\"\n    ],\n    answer: \"Were I you, I would rest.\",\n    why: \"Second-conditional inversion drops 'if' and moves 'Were' before the subject.\"\n  },\n  {\n    id: \"C1-12\",\n    bank: \"C1\",\n    level: \"Apply\",\n    prompt: \"Schools can enhance student mental health ___ communities also share structural responsibility.\",\n    options: [\"in case of\", \"provided that\", \"without\", \"despite\"],\n    answer: \"provided that\",\n    why: \"'Provided that' introduces a mandatory condition followed by a full subject-verb clause.\"\n  },\n  {\n    id: \"N1-01\",\n    bank: \"N1\",\n    level: \"Apply\",\n    prompt: \"In Chapter 1 of The Lost World, why does Edward Malone request a dangerous assignment?\",\n    options: [\n      \"He wants higher pay from the Daily Gazette.\",\n      \"Gladys Hungerton said she could only love a heroic man of action.\",\n      \"Professor Challenger personally invited him on an expedition.\",\n      \"He wanted to escape London completely.\"\n    ],\n    answer: \"Gladys Hungerton said she could only love a heroic man of action.\",\n    why: \"Malone seeks hazardous tasks to win the romantic admiration of Gladys Hungerton.\"\n  },\n  {\n    id: \"L1-02\",\n    bank: \"L1\",\n    level: \"Apply\",\n    prompt: \"The 2023 Egyptian School Health Survey found that counseling access was 74% in urban schools vs. 31% in rural schools. What is the access gap?\",\n    options: [\"23%\", \"34%\", \"43%\", \"50%\"],\n    answer: \"43%\",\n    why: \"74% minus 31% results in a 43-percentage-point disparity.\"\n  },\n\n  // --- TIER 3: Challenge (Higher-Order Analysis & Synthesis) ---\n  {\n    id: \"V1-21\",\n    bank: \"V1\",\n    level: \"Challenge\",\n    prompt: \"A neighborhood lacks lighted parks and healthy food is unaffordable. Under public health frameworks, these are ___.\",\n    options: [\"personal choices\", \"structural barriers\", \"cognitive biases\", \"coping mechanisms\"],\n    answer: \"structural barriers\",\n    why: \"Infrastructural obstacles that restrict healthy options are classified as structural barriers.\"\n  },\n  {\n    id: \"V1-22\",\n    bank: \"V1\",\n    level: \"Challenge\",\n    prompt: \"A school cafeteria displays fresh fruit at eye level while leaving all snacks available. According to Thaler, this is a ___.\",\n    options: [\"nudge\", \"ban\", \"mandate\", \"compulsion\"],\n    answer: \"nudge\",\n    why: \"Altering the choice environment to encourage healthy decisions without forbidding alternatives is a nudge.\"\n  },\n  {\n    id: \"R1-21\",\n    bank: \"R1\",\n    level: \"Challenge\",\n    prompt: \"A study finds teens using image platforms 3+ hours daily are 'twice as likely' to report low self-esteem. Which inference is logically valid?\",\n    options: [\n      \"Social media directly causes depression.\",\n      \"An association exists, but causation is unproven.\",\n      \"All teenagers on social media suffer from low self-esteem.\",\n      \"Eliminating phones will instantly resolve teenage anxiety.\"\n    ],\n    answer: \"An association exists, but causation is unproven.\",\n    why: \"'Twice as likely' identifies statistical correlation, not direct causal proof.\"\n  },\n  {\n    id: \"S1-21\",\n    bank: \"S1\",\n    level: \"Challenge\",\n    prompt: \"Which sentence demonstrates a correct third-conditional inversion?\",\n    options: [\n      \"Had I maintained regular sleep habits, I would have experienced lower stress.\",\n      \"Should I maintain regular sleep habits, I will experience lower stress.\",\n      \"Were I maintaining regular sleep habits, I would experience lower stress.\",\n      \"If had I maintained regular sleep habits, I would have felt better.\"\n    ],\n    answer: \"Had I maintained regular sleep habits, I would have experienced lower stress.\",\n    why: \"Third-conditional inversion drops 'if' and starts with 'Had + subject + past participle'.\"\n  },\n  {\n    id: \"C2-21\",\n    bank: \"C2\",\n    level: \"Challenge\",\n    prompt: \"___ you encounter academic burnout, scheduling short physical breaks can help restore concentration.\",\n    options: [\"Should\", \"Had\", \"Were\", \"Unless\"],\n    answer: \"Should\",\n    why: \"Formal first-conditional inversion begins with 'Should + subject + base verb'.\"\n  }\n];\n\nconst tierOf = (it) => {\n  if (String(it.bank || '').toUpperCase() === 'D1' || /^D1-/i.test(it.id)) return 0;\n  const n = parseInt(String(it.id).split('-')[1], 10);\n  return n <= 10 ? 1 : (n <= 20 ? 2 : 3);\n};\n\nreturn arr.map((it) => {\n  const opts = Array.isArray(it.options) ? it.options : [];\n  const isMcq = opts.length >= 2 && opts.includes(it.answer);\n  return { \n    json: {\n      text: `${it.prompt}\\nWhy: ${it.why || ''}`,\n      id: it.id, \n      bank: it.bank || String(it.id).split('-')[0],\n      tier: 'T' + tierOf(it), \n      format: isMcq ? 'mcq' : 'open',\n      prompt: it.prompt, \n      options: opts.join('||'), \n      answer: it.answer || '', \n      why: it.why || ''\n    } \n  };\n});"
+      },
+      "id": "6e0c082f-8835-45ea-b074-01a219a0bbe1",
+      "name": "Prepare Bank Documents",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        704,
+        896
+      ]
+    },
+    {
+      "parameters": {
+        "mode": "insert",
+        "qdrantCollection": {
+          "__rl": true,
+          "value": "kemet_unit1_bank",
+          "mode": "id"
+        },
+        "options": {}
+      },
+      "id": "72b518dd-ca5e-4ead-8f08-4abac779b222",
+      "name": "Qdrant: Ingest Question Bank",
+      "type": "@n8n/n8n-nodes-langchain.vectorStoreQdrant",
+      "typeVersion": 1.1,
+      "position": [
+        928,
+        800
+      ],
+      "credentials": {
+        "qdrantApi": {
+          "id": "aDfzW7xM3VLVYCRB",
+          "name": "Qdrant account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsonMode": "expressionData",
+        "jsonData": "={{ $json.text }}",
+        "options": {
+          "metadata": {
+            "metadataValues": [
+              {
+                "name": "id",
+                "value": "={{ $json.id }}"
+              },
+              {
+                "name": "bank",
+                "value": "={{ $json.bank }}"
+              },
+              {
+                "name": "tier",
+                "value": "={{ $json.tier }}"
+              },
+              {
+                "name": "format",
+                "value": "={{ $json.format }}"
+              },
+              {
+                "name": "prompt",
+                "value": "={{ $json.prompt }}"
+              },
+              {
+                "name": "options",
+                "value": "={{ $json.options }}"
+              },
+              {
+                "name": "answer",
+                "value": "={{ $json.answer }}"
+              },
+              {
+                "name": "why",
+                "value": "={{ $json.why }}"
+              }
+            ]
+          }
+        }
+      },
+      "id": "4620aa1c-ab01-4487-8e83-6515efe06303",
+      "name": "Bank Document Loader",
+      "type": "@n8n/n8n-nodes-langchain.documentDefaultDataLoader",
+      "typeVersion": 1.1,
+      "position": [
+        1104,
+        1024
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const arr = [\n  {\n    id: \"K-HR\",\n    title: \"Lesson 1: Highlight-Reel Effect\",\n    type: \"reading\",\n    unit: \"Unit 1\",\n    text: \"Research by APA (2023) and JAMA Psychiatry found teens spending over 3 hours daily on image-based platforms (Instagram, TikTok) are twice as likely to report low self-esteem. Selective, filtered posting creates the highlight-reel effect. Note: 'twice as likely' proves correlation, not causation.\"\n  },\n  {\n    id: \"K-WHO\",\n    title: \"Reading A: Exercise, Sleep & Mindfulness\",\n    type: \"reading\",\n    unit: \"Unit 1\",\n    text: \"WHO (2019) recommends 60+ minutes of daily moderate-to-vigorous activity (releasing endorphins to reduce stress). Over 80% of teens worldwide miss this due to sedentary screen habits. Teens need 8-10 hours of sleep; under 7 hours links to anxiety. 10 minutes of daily mindfulness lowers stress hormones.\"\n  },\n  {\n    id: \"K-AGENCY\",\n    title: \"Reading B: Agency, Barriers & Nudges\",\n    type: \"reading\",\n    unit: \"Unit 1\",\n    text: \"Three views on health: (1) Personal Agency & Self-Efficacy (Bandura): belief in one's ability to achieve goals and sustain habits. (2) Structural Barriers: unsafe parks, lack of sports facilities, and costly fresh food are environmental obstacles, not lack of willpower. (3) Nudge Theory (Thaler): reshaping choices (fruit at eye level) makes healthy decisions easier without restricting freedom.\"\n  },\n  {\n    id: \"K-EG\",\n    title: \"Lesson 4: Egyptian School Health Survey (2023)\",\n    type: \"listening\",\n    unit: \"Unit 1\",\n    text: \"2023 Egyptian survey of 450 secondary students (ages 14-17) across 5 governorates: 68% reported high exam stress (academic pressure 82%, social media 61%, lack of sleep 57%). Regular exercise (30+ mins, 4x/week) linked to 34% lower stress. School counseling access: 74% urban vs 31% rural.\"\n  },\n  {\n    id: \"K-GRAMMAR\",\n    title: \"Unit 1 Grammar: Clauses, Participles & Inversions\",\n    type: \"grammar\",\n    unit: \"Unit 1\",\n    text: \"Relative clauses: who/whom for people, which for things, whose+noun for possession. Never repeat the object pronoun. Participles: active (-ing), passive (V3). Avoid dangling participles (opening phrase subject must match subject after comma). Inversions: 'Should + subj + base verb' (1st), 'Were + subj + complement' (2nd), 'Had + subj + V3' (3rd). Hedging: provided that, unless.\"\n  },\n  {\n    id: \"K-JRE\",\n    title: \"Writing: JRE+ Paragraph Model\",\n    type: \"grammar\",\n    unit: \"Unit 1\",\n    text: \"Academic JRE+ 5-sentence paragraph: (1) J - Justification: clear claim with hedging (may, can) avoiding absolutes (always, everyone). (2) R - Reasoning: logical explanation + counterargument. (3) E - Evidence: cite verified study (WHO or Egypt survey). (4) Explanation: connect facts to claim. (5) + Grammar: include relative clause, participle phrase, and inversion.\"\n  },\n  {\n    id: \"K-NOVEL\",\n    title: \"The Lost World - Chapter 1\",\n    type: \"reading\",\n    unit: \"Unit 1\",\n    text: \"Edward Malone (23, reporter at Daily Gazette) proposes to Gladys Hungerton, who says she can only love a hero of action facing danger. Malone asks editor Mr. McArdle for a dangerous mission and is sent to interview zoologist Professor George Edward Challenger about prehistoric animals in South America. Malone uses a student pretext to enter Challenger's home.\"\n  },\n  {\n    id: \"K-VOCAB-CORE\",\n    title: \"Unit 1 Vocabulary: Core Health & Media\",\n    type: \"vocabulary\",\n    unit: \"Unit 1\",\n    text: \"Key Vocabulary: decade (10 years), platform (digital service), transform (change for the better), constructed (deliberately staged), identity (who one is), formation (process of developing), significant (important/measurable), psychological (relating to mind), symptom (sign of condition), self-esteem (self-worth), dissatisfaction (lack of contentment), mechanism (process/system), obvious (clear), acquaintance (slight contact), influencer (social media promoter), phenomenon (observed event), selective (choosing specific parts), filtered (digitally altered).\"\n  },\n  {\n    id: \"K-VOCAB-SURVEY\",\n    title: \"Unit 1 Vocabulary: Survey & Lifestyle\",\n    type: \"vocabulary\",\n    unit: \"Unit 1\",\n    text: \"Key Vocabulary: instinctively (automatic impulse), accurate (correct/exact), nationwide (across the country), survey (investigation/study), urban (city), rural (countryside), governorate (administrative district), adopt (take up a habit), cope (deal with difficulty), academic (educational), pressure (mental strain), moderate (average intensity), insufficient (not enough), sedentary (sitting/inactive), peer (same age/status), collectivist (group/family priority), individualistic (self-reliant), sibling (brother/sister).\"\n  },\n  {\n    id: \"K-VOCAB-WELLNESS\",\n    title: \"Unit 1 Vocabulary: Wellness & Agency\",\n    type: \"vocabulary\",\n    unit: \"Unit 1\",\n    text: \"Key Vocabulary: decisive (firm choices), counselling (professional guidance), targeted (aimed at specific group), meaningfully (with real purpose), well-being (health and happiness), agency (capacity to act independently), self-efficacy (belief in one's ability), resilience (bouncing back from hardship), disempowering (taking away power), mindfulness (present awareness), endorphins (mood-boosting chemicals), fatigue (exhaustion), processed food (food with additives), nudge (gentle choice prompt), nutritionist (diet expert), underestimated (valued too low), measurable (quantifiable).\"\n  },\n  {\n    id: \"K-VOCAB-ACADEMIC\",\n    title: \"Unit 1 Vocabulary: Academic Discourse & JRE\",\n    type: \"vocabulary\",\n    unit: \"Unit 1\",\n    text: \"Key Vocabulary: structural barriers (systemic obstacles), locus of control (internal vs external outcome belief), evidence (empirical facts), bias (prejudice/slant), hedging (cautious language like 'tends to'), evaluative (judgmental tone), rhetorical question (question for effect), intensifier (words like 'totally'), claim (arguable position), counterargument (opposing view), correlation (link between variables), causation (one causing another), representative (fair sample of a whole).\"\n  }\n];\n\nreturn arr.map((it) => ({ \n  json: { \n    text: it.text, \n    id: it.id, \n    title: it.title || '', \n    type: it.type || 'reading', \n    unit: it.unit || 'Unit 1' \n  } \n}));"
+      },
+      "id": "63c39f8d-747f-4cb5-806c-9be7ec3406e9",
+      "name": "Prepare Knowledge Documents",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        704,
+        1296
+      ]
+    },
+    {
+      "parameters": {
+        "mode": "insert",
+        "qdrantCollection": {
+          "__rl": true,
+          "value": "kemet_unit1_knowledge",
+          "mode": "id"
+        },
+        "options": {}
+      },
+      "id": "614ee7ae-7f18-4d2b-ad8e-a8263718fdff",
+      "name": "Qdrant: Ingest Unit 1 Knowledge",
+      "type": "@n8n/n8n-nodes-langchain.vectorStoreQdrant",
+      "typeVersion": 1.1,
+      "position": [
+        928,
+        1296
+      ],
+      "credentials": {
+        "qdrantApi": {
+          "id": "aDfzW7xM3VLVYCRB",
+          "name": "Qdrant account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsonMode": "expressionData",
+        "jsonData": "={{ $json.text }}",
+        "options": {
+          "metadata": {
+            "metadataValues": [
+              {
+                "name": "id",
+                "value": "={{ $json.id }}"
+              },
+              {
+                "name": "title",
+                "value": "={{ $json.title }}"
+              },
+              {
+                "name": "type",
+                "value": "={{ $json.type }}"
+              },
+              {
+                "name": "unit",
+                "value": "={{ $json.unit }}"
+              }
+            ]
+          }
+        }
+      },
+      "id": "abe06489-df40-4f12-9353-57e88681b126",
+      "name": "Knowledge Document Loader",
+      "type": "@n8n/n8n-nodes-langchain.documentDefaultDataLoader",
+      "typeVersion": 1.1,
+      "position": [
+        1008,
+        1536
+      ]
+    },
+    {
+      "parameters": {
+        "content": "## 🏺 Kemet: The Nile Flow\n**Autonomous Socratic tutor** (Observe → Decide → Act)\n\n**Memory layers**\n1. Short-term: window buffer per student (chat context)\n2. Long-term structured: student profile in Qdrant `kemet_student_profiles` (level, streak, attempt, mastery, JRE history)\n3. Long-term semantic: `kemet_student_memory` (misconceptions, JRE feedback, episodes) searched by the agent\n\n**Knowledge**: `kemet_unit1_knowledge` (readings, vocab, grammar) + `kemet_unit1_bank` (330 tiered items)\n\nRun the bottom flow ONCE to load data.",
+        "height": 300,
+        "width": 832,
+        "color": 4
+      },
+      "id": "81efd296-32d8-4bc2-a72b-a67f6e58e36d",
+      "name": "Note 1",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        -240,
+        -64
+      ]
+    },
+    {
+      "parameters": {
+        "content": "## 1 · Entry + Memory lookup\nTelegram + Web webhook → normalise JSON → Config → load profile.\nThe raw Telegram id is hashed to a pseudonymous number (FERPA/COPPA).",
+        "height": 140,
+        "width": 700,
+        "color": 7
+      },
+      "id": "67a5cae0-ecef-4f2e-8ff8-2a712f042779",
+      "name": "Note 2",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        192,
+        400
+      ]
+    },
+    {
+      "parameters": {
+        "content": "## 2 · Wings of Isis (guardrail)\nDistress → kind redirect to adults/counsellor (quiz paused).\nCheating / off-topic → polite Socratic redirect.\nThen Switch: quiz | JRE | command | Socratic (fallback).",
+        "height": 140,
+        "width": 520,
+        "color": 6
+      },
+      "id": "deb24da6-cc32-48c5-8546-e373bce88a21",
+      "name": "Note 3",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        1008,
+        384
+      ]
+    },
+    {
+      "parameters": {
+        "content": "## 3 · Adaptive quiz (Eye of Horus)\nTiers 0=D1 · 1=01-10 · 2=11-20 · 3=21-30.\nTry 1 wrong → hint from `why` (answer masked).\nTry 2 wrong → explain + level DOWN (+2 buttons).\n2 first-try correct → level UP.\nEvery 5 questions → Gmail report (<70% CC teacher).",
+        "height": 150,
+        "width": 700,
+        "color": 5
+      },
+      "id": "1f4381fa-582e-4418-92f8-1f79454e9c80",
+      "name": "Note 4",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        1632,
+        -112
+      ]
+    },
+    {
+      "parameters": {
+        "content": "## 4 · Socratic agent\nGemini + window memory + 2 Qdrant tools (curriculum, student memory).\nOn error → deterministic fallback message.",
+        "height": 100,
+        "width": 640,
+        "color": 3
+      },
+      "id": "960244f7-eb4b-4564-8875-bd115cd06982",
+      "name": "Note 5",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        1008,
+        1168
+      ]
+    },
+    {
+      "parameters": {
+        "content": "## 5 · Output fan-out\nSave profile · reply to Telegram/Web · Gmail report · write semantic memory (misconception / JRE / episode).",
+        "height": 100,
+        "width": 640,
+        "color": 2
+      },
+      "id": "15ed3e52-f914-4298-9486-28dc16ae05b1",
+      "name": "Note 6",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        2496,
+        160
+      ]
+    },
+    {
+      "parameters": {
+        "content": "## ⚙️ Setup (run once)\n1. Put kemet_question_bank.json and kemet_unit1_knowledge.json in the n8n /files folder.\n2. Click 'Run Once' - it creates the profile collection and embeds both datasets into Qdrant.\n3. Assign credentials: Telegram, Gemini, Qdrant, Gmail.\n4. Activate the workflow.",
+        "height": 220,
+        "width": 620,
+        "color": 4
+      },
+      "id": "f9e761c8-8a68-4859-83bd-bc271b7166bb",
+      "name": "Note 7",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        32,
+        1808
+      ]
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Telegram Trigger": {
+      "main": [
+        [
+          {
+            "node": "Normalize Input",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Normalize Input": {
+      "main": [
+        [
+          {
+            "node": "Config",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Config": {
+      "main": [
+        [
+          {
+            "node": "Load Student Profile (Qdrant)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Load Student Profile (Qdrant)": {
+      "main": [
+        [
+          {
+            "node": "Merge Profile",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Merge Profile": {
+      "main": [
+        [
+          {
+            "node": "Wings of Isis Guardrail",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Wings of Isis Guardrail": {
+      "main": [
+        [
+          {
+            "node": "Route Intent",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Route Intent": {
+      "main": [
+        [
+          {
+            "node": "Distress Reply",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Blocked Reply",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Quiz Planner",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Finalize Output",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Command Handler",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Socratic Tutor Agent",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Distress Reply": {
+      "main": [
+        [
+          {
+            "node": "Finalize Output",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Finalize Output": {
+      "main": [
+        [
+          {
+            "node": "Save Student Profile (Qdrant)",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Route by Channel",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Email Needed?",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Memory Worth Saving?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Route by Channel": {
+      "main": [
+        [
+          {
+            "node": "Telegram: Text",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Telegram: 4 Options",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Telegram: 2 Options",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Telegram: Next",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Respond to Web Portal",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Email Needed?": {
+      "main": [
+        [
+          {
+            "node": "Download file",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Download file": {
+      "main": [
+        [
+          {
+            "node": "Send a message",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Memory Worth Saving?": {
+      "main": [
+        [
+          {
+            "node": "Build Memory Document",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Build Memory Document": {
+      "main": [
+        [
+          {
+            "node": "Qdrant: Save Student Memory",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Embeddings Gemini": {
+      "ai_embedding": [
+        [
+          {
+            "node": "Qdrant: Save Student Memory",
+            "type": "ai_embedding",
+            "index": 0
+          },
+          {
+            "node": "Qdrant: Ingest Question Bank",
+            "type": "ai_embedding",
+            "index": 0
+          },
+          {
+            "node": "Qdrant: Ingest Unit 1 Knowledge",
+            "type": "ai_embedding",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Memory Document Loader": {
+      "ai_document": [
+        [
+          {
+            "node": "Qdrant: Save Student Memory",
+            "type": "ai_document",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Blocked Reply": {
+      "main": [
+        [
+          {
+            "node": "Finalize Output",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Quiz Planner": {
+      "main": [
+        [
+          {
+            "node": "Fetch Question (Qdrant)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Fetch Question (Qdrant)": {
+      "main": [
+        [
+          {
+            "node": "Adaptive Quiz Engine",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Adaptive Quiz Engine": {
+      "main": [
+        [
+          {
+            "node": "Finalize Output",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Command Handler": {
+      "main": [
+        [
+          {
+            "node": "Finalize Output",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Socratic Tutor Agent": {
+      "main": [
+        [
+          {
+            "node": "Format Socratic Reply",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Gemini Chat (Tutor)": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "Socratic Tutor Agent",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Short-Term Memory (per student)": {
+      "ai_memory": [
+        [
+          {
+            "node": "Socratic Tutor Agent",
+            "type": "ai_memory",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Format Socratic Reply": {
+      "main": [
+        [
+          {
+            "node": "Finalize Output",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Web Portal Webhook": {
+      "main": [
+        [
+          {
+            "node": "Normalize Input",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Run Once: Setup & Ingest Knowledge": {
+      "main": [
+        [
+          {
+            "node": "Setup Config",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Setup Config": {
+      "main": [
+        [
+          {
+            "node": "Create Profiles Collection",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Create Profiles Collection": {
+      "main": [
+        [
+          {
+            "node": "Prepare Bank Documents",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Prepare Knowledge Documents",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Prepare Bank Documents": {
+      "main": [
+        [
+          {
+            "node": "Qdrant: Ingest Question Bank",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Bank Document Loader": {
+      "ai_document": [
+        [
+          {
+            "node": "Qdrant: Ingest Question Bank",
+            "type": "ai_document",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Prepare Knowledge Documents": {
+      "main": [
+        [
+          {
+            "node": "Qdrant: Ingest Unit 1 Knowledge",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Knowledge Document Loader": {
+      "ai_document": [
+        [
+          {
+            "node": "Qdrant: Ingest Unit 1 Knowledge",
+            "type": "ai_document",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": true,
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate",
+    "availableInMCP": true
+  },
+  "versionId": "0521e01a-b92b-4833-84ec-b132a8ba58e7",
+  "meta": {
+    "templateCredsSetupCompleted": true,
+    "instanceId": "1f2b3148dc3a0f468fd5f7e3833b319a1bee50dc2ca77eaba4cdd65cd4026bdc"
+  },
+  "nodeGroups": [],
+  "id": "QqzH6NCrRVdjjU3m",
+  "tags": []
+}
